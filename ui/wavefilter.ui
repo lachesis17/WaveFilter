@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1400</width>
-    <height>860</height>
+    <height>950</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -33,6 +33,12 @@
        <bool>true</bool>
       </property>
       <widget class="QSplitter" name="plot_splitter">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+         <horstretch>1</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="orientation">
         <enum>Qt::Vertical</enum>
        </property>
@@ -74,13 +80,13 @@
       <widget class="QScrollArea" name="control_scroll">
        <property name="minimumSize">
         <size>
-         <width>280</width>
+         <width>360</width>
          <height>0</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>360</width>
+         <width>16777215</width>
          <height>16777215</height>
         </size>
        </property>
@@ -96,7 +102,7 @@
           <x>0</x>
           <y>0</y>
           <width>395</width>
-          <height>879</height>
+          <height>930</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_panel">
@@ -443,7 +449,17 @@
                 </item>
                 <item>
                  <property name="text">
+                  <string>Band Stop Filter</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
                   <string>Notch Filter</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Savitzky-Golay Filter</string>
                  </property>
                 </item>
                 <item>
@@ -529,6 +545,100 @@
                 </property>
                </widget>
               </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="label_filter_design">
+                <property name="text">
+                 <string>Design</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QComboBox" name="filter_design_combo">
+                <item>
+                 <property name="text">
+                  <string>Butterworth</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Chebyshev I</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Chebyshev II</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Elliptic</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Bessel</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="label_ripple">
+                <property name="text">
+                 <string>Ripple (dB)</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QDoubleSpinBox" name="ripple_spin">
+                <property name="suffix">
+                 <string> dB</string>
+                </property>
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="minimum">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>20.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="value">
+                 <double>3.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="0">
+               <widget class="QLabel" name="label_attenuation">
+                <property name="text">
+                 <string>Attenuation (dB)</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1">
+               <widget class="QDoubleSpinBox" name="attenuation_spin">
+                <property name="suffix">
+                 <string> dB</string>
+                </property>
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="minimum">
+                 <double>1.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>120.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="value">
+                 <double>20.000000000000000</double>
+                </property>
+               </widget>
+              </item>
              </layout>
             </item>
             <item>
@@ -536,6 +646,12 @@
               <property name="alternatingRowColors">
                <bool>true</bool>
               </property>
+              <property name="indentation">
+               <number>0</number>
+              </property>
+              <attribute name="headerMinimumSectionSize">
+               <number>40</number>
+              </attribute>
               <column>
                <property name="text">
                 <string>Filter</string>
@@ -573,13 +689,6 @@
               </item>
              </layout>
             </item>
-            <item>
-             <widget class="QPushButton" name="clear_all_button">
-              <property name="text">
-               <string>Clear All Filters</string>
-              </property>
-             </widget>
-            </item>
            </layout>
           </widget>
          </item>
@@ -595,19 +704,6 @@
             <bool>true</bool>
            </property>
           </widget>
-         </item>
-         <item>
-          <spacer name="verticalSpacer">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>20</width>
-             <height>40</height>
-            </size>
-           </property>
-          </spacer>
          </item>
         </layout>
        </widget>

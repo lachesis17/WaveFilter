@@ -65,8 +65,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.generate_button.clicked.connect(self._generate_test_signal)
         self.apply_fft_button.clicked.connect(self._apply_fft_handler)
         self.apply_filter_button.clicked.connect(self._apply_filter_committed)
-        self.clear_button.clicked.connect(lambda: self._clear_filters(clear_all=False))
-        self.clear_all_button.clicked.connect(lambda: self._clear_filters(clear_all=True))
+        self.clear_button.clicked.connect(lambda: self._clear_filters)
 
         self.preview_check.toggled.connect(self._preview_toggled)
 
@@ -80,6 +79,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.filter_order_spin.valueChanged.connect(self._on_filter_param_changed)
         self.window_check_filter.toggled.connect(self._on_filter_param_changed)
         self.filter_combo.currentIndexChanged.connect(self._on_filter_param_changed)
+        self.filter_design_combo.currentIndexChanged.connect(self._filter_changed_handler)
+        self.filter_design_combo.currentIndexChanged.connect(self._on_filter_param_changed)
+        self.ripple_spin.valueChanged.connect(self._on_filter_param_changed)
+        self.attenuation_spin.valueChanged.connect(self._on_filter_param_changed)
 
         for spinbox in (self.low_peak_freq_spin, self.high_peak_freq_spin,
                         self.min_peak_amp_spin, self.kalman_noise_spin):
@@ -103,21 +106,54 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def _filter_changed_handler(self):
         filter_type = self.filter_combo.currentText()
-        if filter_type == "Low Pass Filter":
+
+        self.label_filter_low.setText("Low Frequency")
+        self.label_filter_high.setText("High Frequency")
+        self.label_filter_order.setText("Order")
+        self.filter_low_spin.setSuffix(" Hz")
+
+        if filter_type == "Savitzky-Golay Filter":
             self.filter_low_spin.setEnabled(True)
             self.filter_high_spin.setEnabled(False)
-        elif filter_type == "High Pass Filter":
-            self.filter_low_spin.setEnabled(False)
-            self.filter_high_spin.setEnabled(True)
-        elif filter_type == "Band Pass Filter":
-            self.filter_low_spin.setEnabled(True)
-            self.filter_high_spin.setEnabled(True)
-        elif filter_type == "Notch Filter":
-            self.filter_low_spin.setEnabled(True)
-            self.filter_high_spin.setEnabled(False)
+            self.label_filter_low.setText("Window Length")
+            self.label_filter_order.setText("Poly Order")
+            self.filter_low_spin.setSuffix("")
+            self._set_design_visible(False)
         elif filter_type == "IFFT / Kalman Filter":
             self.filter_low_spin.setEnabled(False)
             self.filter_high_spin.setEnabled(False)
+            self._set_design_visible(False)
+        elif filter_type == "Notch Filter":
+            self.filter_low_spin.setEnabled(True)
+            self.filter_high_spin.setEnabled(False)
+            self._set_design_visible(False)
+        elif filter_type == "Low Pass Filter":
+            self.filter_low_spin.setEnabled(True)
+            self.filter_high_spin.setEnabled(False)
+            self._set_design_visible(True)
+        elif filter_type == "High Pass Filter":
+            self.filter_low_spin.setEnabled(False)
+            self.filter_high_spin.setEnabled(True)
+            self._set_design_visible(True)
+        elif filter_type in ("Band Pass Filter", "Band Stop Filter"):
+            self.filter_low_spin.setEnabled(True)
+            self.filter_high_spin.setEnabled(True)
+            self._set_design_visible(True)
+
+    def _set_design_visible(self, visible: bool):
+        self.label_filter_design.setVisible(visible)
+        self.filter_design_combo.setVisible(visible)
+        if visible:
+            design = self.filter_design_combo.currentText()
+            show_ripple = design in ("Chebyshev I", "Elliptic")
+            show_atten = design in ("Chebyshev II", "Elliptic")
+        else:
+            show_ripple = False
+            show_atten = False
+        self.label_ripple.setVisible(show_ripple)
+        self.ripple_spin.setVisible(show_ripple)
+        self.label_attenuation.setVisible(show_atten)
+        self.attenuation_spin.setVisible(show_atten)
 
     def _load_file(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -496,16 +532,29 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         if _args is not None:
-            window_arg = _args[-1]
-            core_args = _args[:-1]
-            low_freq, high_freq, order = core_args[0], core_args[1], core_args[2]
+            low_freq, high_freq, order, window_arg = _args[0], _args[1], _args[2], _args[3]
+            filter_design = _args[4] if len(_args) > 4 else 'butter'
+            ripple = _args[5] if len(_args) > 5 else 3.0
+            attenuation = _args[6] if len(_args) > 6 else 60.0
         else:
             window_arg = self.window_check_filter.isChecked()
             low_freq = self.filter_low_spin.value()
             high_freq = self.filter_high_spin.value()
             order = self.filter_order_spin.value()
+            filter_design = {
+                "Butterworth": "butter",
+                "Chebyshev I": "cheby1",
+                "Chebyshev II": "cheby2",
+                "Elliptic": "ellip",
+                "Bessel": "bessel",
+            }.get(self.filter_design_combo.currentText(), "butter")
+            ripple = self.ripple_spin.value()
+            attenuation = self.attenuation_spin.value()
 
-        result = Filters.apply_standard_filter(signal_series, sample_rate, filter_type, low_freq, high_freq, int(order))
+        result = Filters.apply_standard_filter(
+            signal_series, sample_rate, filter_type, low_freq, high_freq, int(order),
+            filter_design, ripple, attenuation,
+        )
         if result is None:
             return
 
@@ -518,7 +567,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if apply:
             self.filter_obj._applied_filters.append(
-                (filter_type, [low_freq, high_freq, order, window_arg])
+                (filter_type, [round(low_freq, 1), round(high_freq, 1), order, window_arg,
+                               filter_design, round(ripple, 1), round(attenuation, 1)])
             )
 
     def _apply_filter_preview(self):
@@ -538,7 +588,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.preview_check.setChecked(False)
         self._refresh()
 
-    def _clear_filters(self, clear_all=False):
+    def _clear_filters(self):
         if self.filter_obj is None:
             return
         self.filter_obj._applied_filters = []

@@ -18,8 +18,8 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox,
     QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
     QLabel, QMainWindow, QPushButton, QScrollArea,
-    QSizePolicy, QSpacerItem, QSpinBox, QSplitter,
-    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
+    QSizePolicy, QSpinBox, QSplitter, QTreeWidget,
+    QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from pyqtgraph import PlotWidget
 
@@ -27,7 +27,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(1400, 860)
+        MainWindow.resize(1400, 950)
         MainWindow.setMinimumSize(QSize(900, 600))
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
@@ -40,37 +40,42 @@ class Ui_MainWindow(object):
         self.main_splitter.setChildrenCollapsible(True)
         self.plot_splitter = QSplitter(self.main_splitter)
         self.plot_splitter.setObjectName(u"plot_splitter")
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        sizePolicy.setHorizontalStretch(1)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.plot_splitter.sizePolicy().hasHeightForWidth())
+        self.plot_splitter.setSizePolicy(sizePolicy)
         self.plot_splitter.setOrientation(Qt.Vertical)
         self.plot_splitter.setHandleWidth(10)
         self.plot_splitter.setChildrenCollapsible(True)
         self.fft_plot = PlotWidget(self.plot_splitter)
         self.fft_plot.setObjectName(u"fft_plot")
-        sizePolicy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(2)
-        sizePolicy.setHeightForWidth(self.fft_plot.sizePolicy().hasHeightForWidth())
-        self.fft_plot.setSizePolicy(sizePolicy)
+        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        sizePolicy1.setHorizontalStretch(0)
+        sizePolicy1.setVerticalStretch(2)
+        sizePolicy1.setHeightForWidth(self.fft_plot.sizePolicy().hasHeightForWidth())
+        self.fft_plot.setSizePolicy(sizePolicy1)
         self.fft_plot.setMinimumSize(QSize(400, 180))
         self.plot_splitter.addWidget(self.fft_plot)
         self.signal_plot = PlotWidget(self.plot_splitter)
         self.signal_plot.setObjectName(u"signal_plot")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-        sizePolicy1.setHorizontalStretch(0)
-        sizePolicy1.setVerticalStretch(3)
-        sizePolicy1.setHeightForWidth(self.signal_plot.sizePolicy().hasHeightForWidth())
-        self.signal_plot.setSizePolicy(sizePolicy1)
+        sizePolicy2 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        sizePolicy2.setHorizontalStretch(0)
+        sizePolicy2.setVerticalStretch(3)
+        sizePolicy2.setHeightForWidth(self.signal_plot.sizePolicy().hasHeightForWidth())
+        self.signal_plot.setSizePolicy(sizePolicy2)
         self.signal_plot.setMinimumSize(QSize(400, 260))
         self.plot_splitter.addWidget(self.signal_plot)
         self.main_splitter.addWidget(self.plot_splitter)
         self.control_scroll = QScrollArea(self.main_splitter)
         self.control_scroll.setObjectName(u"control_scroll")
-        self.control_scroll.setMinimumSize(QSize(280, 0))
-        self.control_scroll.setMaximumSize(QSize(360, 16777215))
+        self.control_scroll.setMinimumSize(QSize(360, 0))
+        self.control_scroll.setMaximumSize(QSize(16777215, 16777215))
         self.control_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.control_scroll.setWidgetResizable(True)
         self.scroll_contents = QWidget()
         self.scroll_contents.setObjectName(u"scroll_contents")
-        self.scroll_contents.setGeometry(QRect(0, 0, 395, 879))
+        self.scroll_contents.setGeometry(QRect(0, 0, 395, 930))
         self.verticalLayout_panel = QVBoxLayout(self.scroll_contents)
         self.verticalLayout_panel.setObjectName(u"verticalLayout_panel")
         self.file_group = QGroupBox(self.scroll_contents)
@@ -271,6 +276,8 @@ class Ui_MainWindow(object):
         self.filter_combo.addItem("")
         self.filter_combo.addItem("")
         self.filter_combo.addItem("")
+        self.filter_combo.addItem("")
+        self.filter_combo.addItem("")
         self.filter_combo.setObjectName(u"filter_combo")
 
         self.horizontalLayout_filter_top.addWidget(self.filter_combo)
@@ -321,12 +328,59 @@ class Ui_MainWindow(object):
 
         self.formLayout_filter_params.setWidget(2, QFormLayout.FieldRole, self.filter_order_spin)
 
+        self.label_filter_design = QLabel(self.filters_group)
+        self.label_filter_design.setObjectName(u"label_filter_design")
+
+        self.formLayout_filter_params.setWidget(3, QFormLayout.LabelRole, self.label_filter_design)
+
+        self.filter_design_combo = QComboBox(self.filters_group)
+        self.filter_design_combo.addItem("")
+        self.filter_design_combo.addItem("")
+        self.filter_design_combo.addItem("")
+        self.filter_design_combo.addItem("")
+        self.filter_design_combo.addItem("")
+        self.filter_design_combo.setObjectName(u"filter_design_combo")
+
+        self.formLayout_filter_params.setWidget(3, QFormLayout.FieldRole, self.filter_design_combo)
+
+        self.label_ripple = QLabel(self.filters_group)
+        self.label_ripple.setObjectName(u"label_ripple")
+
+        self.formLayout_filter_params.setWidget(4, QFormLayout.LabelRole, self.label_ripple)
+
+        self.ripple_spin = QDoubleSpinBox(self.filters_group)
+        self.ripple_spin.setObjectName(u"ripple_spin")
+        self.ripple_spin.setDecimals(1)
+        self.ripple_spin.setMinimum(0.100000000000000)
+        self.ripple_spin.setMaximum(20.000000000000000)
+        self.ripple_spin.setSingleStep(0.100000000000000)
+        self.ripple_spin.setValue(3.000000000000000)
+
+        self.formLayout_filter_params.setWidget(4, QFormLayout.FieldRole, self.ripple_spin)
+
+        self.label_attenuation = QLabel(self.filters_group)
+        self.label_attenuation.setObjectName(u"label_attenuation")
+
+        self.formLayout_filter_params.setWidget(5, QFormLayout.LabelRole, self.label_attenuation)
+
+        self.attenuation_spin = QDoubleSpinBox(self.filters_group)
+        self.attenuation_spin.setObjectName(u"attenuation_spin")
+        self.attenuation_spin.setDecimals(1)
+        self.attenuation_spin.setMinimum(1.000000000000000)
+        self.attenuation_spin.setMaximum(120.000000000000000)
+        self.attenuation_spin.setSingleStep(0.100000000000000)
+        self.attenuation_spin.setValue(20.000000000000000)
+
+        self.formLayout_filter_params.setWidget(5, QFormLayout.FieldRole, self.attenuation_spin)
+
 
         self.verticalLayout_filters.addLayout(self.formLayout_filter_params)
 
         self.filter_tree = QTreeWidget(self.filters_group)
         self.filter_tree.setObjectName(u"filter_tree")
         self.filter_tree.setAlternatingRowColors(True)
+        self.filter_tree.setIndentation(0)
+        self.filter_tree.header().setMinimumSectionSize(40)
 
         self.verticalLayout_filters.addWidget(self.filter_tree)
 
@@ -350,11 +404,6 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_filters.addLayout(self.horizontalLayout_filter_actions)
 
-        self.clear_all_button = QPushButton(self.filters_group)
-        self.clear_all_button.setObjectName(u"clear_all_button")
-
-        self.verticalLayout_filters.addWidget(self.clear_all_button)
-
 
         self.verticalLayout_panel.addWidget(self.filters_group)
 
@@ -363,10 +412,6 @@ class Ui_MainWindow(object):
         self.info_label.setWordWrap(True)
 
         self.verticalLayout_panel.addWidget(self.info_label)
-
-        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-
-        self.verticalLayout_panel.addItem(self.verticalSpacer)
 
         self.control_scroll.setWidget(self.scroll_contents)
         self.main_splitter.addWidget(self.control_scroll)
@@ -420,21 +465,33 @@ class Ui_MainWindow(object):
         self.filter_combo.setItemText(0, QCoreApplication.translate("MainWindow", u"Low Pass Filter", None))
         self.filter_combo.setItemText(1, QCoreApplication.translate("MainWindow", u"High Pass Filter", None))
         self.filter_combo.setItemText(2, QCoreApplication.translate("MainWindow", u"Band Pass Filter", None))
-        self.filter_combo.setItemText(3, QCoreApplication.translate("MainWindow", u"Notch Filter", None))
-        self.filter_combo.setItemText(4, QCoreApplication.translate("MainWindow", u"IFFT / Kalman Filter", None))
+        self.filter_combo.setItemText(3, QCoreApplication.translate("MainWindow", u"Band Stop Filter", None))
+        self.filter_combo.setItemText(4, QCoreApplication.translate("MainWindow", u"Notch Filter", None))
+        self.filter_combo.setItemText(5, QCoreApplication.translate("MainWindow", u"Savitzky-Golay Filter", None))
+        self.filter_combo.setItemText(6, QCoreApplication.translate("MainWindow", u"IFFT / Kalman Filter", None))
 
         self.label_filter_low.setText(QCoreApplication.translate("MainWindow", u"Low Frequency", None))
         self.filter_low_spin.setSuffix(QCoreApplication.translate("MainWindow", u" Hz", None))
         self.label_filter_high.setText(QCoreApplication.translate("MainWindow", u"High Frequency", None))
         self.filter_high_spin.setSuffix(QCoreApplication.translate("MainWindow", u" Hz", None))
         self.label_filter_order.setText(QCoreApplication.translate("MainWindow", u"Order", None))
+        self.label_filter_design.setText(QCoreApplication.translate("MainWindow", u"Design", None))
+        self.filter_design_combo.setItemText(0, QCoreApplication.translate("MainWindow", u"Butterworth", None))
+        self.filter_design_combo.setItemText(1, QCoreApplication.translate("MainWindow", u"Chebyshev I", None))
+        self.filter_design_combo.setItemText(2, QCoreApplication.translate("MainWindow", u"Chebyshev II", None))
+        self.filter_design_combo.setItemText(3, QCoreApplication.translate("MainWindow", u"Elliptic", None))
+        self.filter_design_combo.setItemText(4, QCoreApplication.translate("MainWindow", u"Bessel", None))
+
+        self.label_ripple.setText(QCoreApplication.translate("MainWindow", u"Ripple (dB)", None))
+        self.ripple_spin.setSuffix(QCoreApplication.translate("MainWindow", u" dB", None))
+        self.label_attenuation.setText(QCoreApplication.translate("MainWindow", u"Attenuation (dB)", None))
+        self.attenuation_spin.setSuffix(QCoreApplication.translate("MainWindow", u" dB", None))
         ___qtreewidgetitem = self.filter_tree.headerItem()
         ___qtreewidgetitem.setText(1, QCoreApplication.translate("MainWindow", u"Parameters", None));
         ___qtreewidgetitem.setText(0, QCoreApplication.translate("MainWindow", u"Filter", None));
         self.preview_check.setText(QCoreApplication.translate("MainWindow", u"Preview", None))
         self.clear_button.setText(QCoreApplication.translate("MainWindow", u"Clear", None))
         self.apply_filter_button.setText(QCoreApplication.translate("MainWindow", u"Apply Filter", None))
-        self.clear_all_button.setText(QCoreApplication.translate("MainWindow", u"Clear All Filters", None))
         self.info_label.setStyleSheet(QCoreApplication.translate("MainWindow", u"color: gray;", None))
         self.info_label.setText(QCoreApplication.translate("MainWindow", u"Open a file to begin.", None))
     # retranslateUi
