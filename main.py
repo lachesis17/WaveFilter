@@ -1,0 +1,625 @@
+import ctypes
+import sys
+import wave
+from pathlib import Path
+
+import librosa
+import numpy as np
+import pandas as pd
+from PySide6.QtCore import Qt, QThread
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog,
+                               QInputDialog, QLabel, QMainWindow, QMessageBox,
+                               QProgressBar, QTreeWidgetItem, QVBoxLayout)
+import pyqtgraph as pg
+
+from src.config import ConfigManager
+from src.filters import Filters
+from src.helpers import ColumnPickerDialog, FileLoadWorker
+from ui.wavefilter_ui import Ui_MainWindow
+
+appid = 'WaveFilter'
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appid)
+
+
+class MainWindow(QMainWindow, Ui_MainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+
+        self.filter_obj: Filters | None = None
+        self._raw_filter_visible = True
+        self._filtered_filter_visible = True
+
+        self.raw_line = None
+        self.filter_line = None
+        self.fft_line = None
+
+        self._config_manager = ConfigManager()
+
+        # held state across async loading
+        self._load_dialog = None
+        self._pending_load_path = None
+        self._load_thread = None
+        self._load_worker = None
+
+        self.setWindowIcon(QIcon('ui/icon.ico'))
+
+        self._setup_plots()
+        self._connect_signals()
+        self._filter_changed_handler()
+
+    def _setup_plots(self):
+        self.fft_plot.setLabel('left', 'Amp')
+        self.fft_plot.setLabel('bottom', 'Freq (Hz)')
+        self.fft_plot.showGrid(x=True, y=True, alpha=0.3)
+        self.fft_legend = self.fft_plot.addLegend()
+
+        self.signal_plot.setLabel('left', 'Amp')
+        self.signal_plot.setLabel('bottom', 'Time (s)')
+        self.signal_plot.showGrid(x=True, y=True, alpha=0.3)
+        self.signal_legend = self.signal_plot.addLegend()
+
+    def _connect_signals(self):
+        self.open_button.clicked.connect(self._load_file)
+        self.generate_button.clicked.connect(self._generate_test_signal)
+        self.apply_fft_button.clicked.connect(self._apply_fft_handler)
+        self.apply_filter_button.clicked.connect(self._apply_filter_committed)
+        self.clear_button.clicked.connect(lambda: self._clear_filters(clear_all=False))
+        self.clear_all_button.clicked.connect(lambda: self._clear_filters(clear_all=True))
+
+        self.preview_check.toggled.connect(self._preview_toggled)
+
+        self.raw_visible_check.toggled.connect(lambda s: self._handle_filters_visible(s, 'raw'))
+        self.filtered_visible_check.toggled.connect(lambda s: self._handle_filters_visible(s, 'filtered'))
+
+        self.filter_combo.currentIndexChanged.connect(self._filter_changed_handler)
+
+        for spinbox in (self.filter_low_spin, self.filter_high_spin):
+            spinbox.valueChanged.connect(self._on_filter_param_changed)
+        self.filter_order_spin.valueChanged.connect(self._on_filter_param_changed)
+        self.window_check_filter.toggled.connect(self._on_filter_param_changed)
+        self.filter_combo.currentIndexChanged.connect(self._on_filter_param_changed)
+
+        for spinbox in (self.low_peak_freq_spin, self.high_peak_freq_spin,
+                        self.min_peak_amp_spin, self.kalman_noise_spin):
+            spinbox.valueChanged.connect(self._on_filter_param_changed)
+        self.kalman_check.toggled.connect(self._on_filter_param_changed)
+        self.normalize_check.toggled.connect(self._on_filter_param_changed)
+        self.window_check_fft.toggled.connect(self._on_filter_param_changed)
+        self.fft_mode_combo.currentIndexChanged.connect(self._on_filter_param_changed)
+
+    def _preview_toggled(self, checked):
+        if not checked:
+            self._apply_all_filters()
+            self._replot()
+            self._populate_legend()
+        else:
+            self._apply_filter_preview()
+
+    def _on_filter_param_changed(self):
+        if self.preview_check.isChecked():
+            self._apply_filter_preview()
+
+    def _filter_changed_handler(self):
+        filter_type = self.filter_combo.currentText()
+        if filter_type == "Low Pass Filter":
+            self.filter_low_spin.setEnabled(True)
+            self.filter_high_spin.setEnabled(False)
+        elif filter_type == "High Pass Filter":
+            self.filter_low_spin.setEnabled(False)
+            self.filter_high_spin.setEnabled(True)
+        elif filter_type == "Band Pass Filter":
+            self.filter_low_spin.setEnabled(True)
+            self.filter_high_spin.setEnabled(True)
+        elif filter_type == "Notch Filter":
+            self.filter_low_spin.setEnabled(True)
+            self.filter_high_spin.setEnabled(False)
+        elif filter_type == "IFFT / Kalman Filter":
+            self.filter_low_spin.setEnabled(False)
+            self.filter_high_spin.setEnabled(False)
+
+    def _load_file(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open File", self._config_manager.get_last_directory(),
+            "Audio & Data Files (*.wav *.mp3 *.xlsx *.xls *.csv);;WAV (*.wav);;MP3 (*.mp3);;Excel (*.xlsx *.xls);;CSV (*.csv);;All Files (*)"
+        )
+        if not path:
+            return
+        self._config_manager.update_last_directory(path)
+
+        suffix = Path(path).suffix.lower()
+
+        # dialogs need to stay in main thread
+        if suffix in ('.xlsx', '.xls', '.csv'):
+            try:
+                signal, sample_rate = self._load_spreadsheet(path, suffix)
+            except Exception as e:
+                QMessageBox.critical(self, "Load error", str(e))
+                return
+            if signal is None:
+                return
+            self._finish_load(path, signal, sample_rate)
+            return
+
+        if suffix == '.wav':
+            loader = self._load_wav
+        elif suffix == '.mp3':
+            loader = self._load_mp3
+        else:
+            QMessageBox.warning(self, "Unsupported format", f"Cannot load '{suffix}' files.")
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Loading")
+        dialog.setModal(True)
+        dialog.setFixedWidth(400)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Loading file, please wait..."))
+        bar = QProgressBar()
+        bar.setRange(0, 0)
+        layout.addWidget(bar)
+        dialog.show()
+
+        self._pending_load_path = path
+        self._load_dialog = dialog
+
+        thread = QThread()
+        worker = FileLoadWorker(loader, path)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._on_file_loaded, Qt.ConnectionType.QueuedConnection)
+        worker.error.connect(self._on_file_load_error, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._load_thread = thread
+        self._load_worker = worker
+        thread.start()
+
+    def _on_file_loaded(self, result):
+        signal_arr, sample_rate = result
+        self._finish_load(self._pending_load_path, signal_arr, sample_rate)
+        self._load_dialog.close()
+        self._load_thread.quit()
+
+    def _on_file_load_error(self, msg):
+        self._load_dialog.close()
+        QMessageBox.critical(self, "Load error", msg)
+        self._load_thread.quit()
+
+    def _finish_load(self, path, signal, sample_rate):
+        n = len(signal)
+        time = np.arange(n) / sample_rate
+
+        fo = Filters()
+        fo._raw = signal.astype(float)
+        fo._filtered = fo._raw.copy()
+        fo._time = time
+        fo._applied_filters = []
+        self.filter_obj = fo
+
+        duration = n / sample_rate
+        self.file_label.setText(Path(path).name)
+        self.info_label.setText(
+            f"Sample Rate: {sample_rate} Hz  |  Samples: {n}  |  Duration: {duration:.3f} s"
+        )
+
+        self._clear_plots()
+        self._refresh()
+
+    def _generate_test_signal(self):
+        """
+        Generate a randomised synthetic signal.
+        Picks 2 to 4 components with randomly chosen wave shapes
+        (sine, square, sawtooth, triangle), frequencies, amplitudes,
+        adds gaussian noise, normalised to -1, 1.
+        """
+        from scipy.signal import square, sawtooth
+
+        sample_rate = 8_000
+        duration = 3.0
+        t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+        rng = np.random.default_rng()
+
+        wave_builders = {
+            'sine':     lambda f: np.sin(2 * np.pi * f * t),
+            'square':   lambda f: square(2 * np.pi * f * t),
+            'sawtooth': lambda f: sawtooth(2 * np.pi * f * t),
+            'triangle': lambda f: sawtooth(2 * np.pi * f * t, width=0.5),
+        }
+
+        n_components = int(rng.integers(2, 5))
+        wave_types = rng.choice(list(wave_builders.keys()), size=n_components, replace=True)
+        freqs = rng.integers(50, 3_500, size=n_components)
+        amps = rng.uniform(0.2, 0.8, size=n_components)
+        amps = amps / amps.sum()  # sum to ~1 before noise
+
+        signal = sum(
+            amps[i] * wave_builders[wave_types[i]](freqs[i])
+            for i in range(n_components)
+        )
+        signal += rng.normal(0, rng.uniform(0.05, 0.15), len(t))
+        signal = signal / np.max(np.abs(signal))
+
+        fo = Filters()
+        fo._raw = signal
+        fo._filtered = signal.copy()
+        fo._time = t
+        fo._applied_filters = []
+        self.filter_obj = fo
+
+        components_str = '  +  '.join(
+            f"{wave_types[i]} {freqs[i]} Hz" for i in range(n_components)
+        )
+        self.file_label.setText("Test Signal (generated)")
+        self.info_label.setText(
+            f"Sample Rate: {sample_rate} Hz  |  Samples: {len(t)}  |  Duration: {duration:.1f} s"
+            f"  |  {components_str}  +  noise"
+        )
+        self._clear_plots()
+        self._refresh()
+
+    def _load_wav(self, path):
+        with wave.open(path, 'rb') as wf:
+            sample_rate = wf.getframerate()
+            num_channels = wf.getnchannels()
+            sample_width = wf.getsampwidth()
+            num_frames = wf.getnframes()
+            raw = wf.readframes(num_frames)
+
+        if sample_width == 1:
+            data = np.frombuffer(raw, dtype=np.uint8)
+            signal = (data.astype(float) - 128.0) / 128.0
+        elif sample_width == 2:
+            data = np.frombuffer(raw, dtype=np.int16)
+            signal = data.astype(float) / 32768.0
+        elif sample_width == 3:
+            data = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3 * num_channels)
+            # pad 3-byte samples to int32
+            padded = np.zeros((len(data), num_channels), dtype=np.int32)
+            for ch in range(num_channels):
+                for i in range(len(data)):
+                    b = data[i, ch * 3: ch * 3 + 3]
+                    val = int.from_bytes(b, 'little', signed=True)
+                    padded[i, ch] = val
+            signal = padded[:, 0].astype(float) / 8388608.0
+            signal = signal / np.max(np.abs(signal))
+            return signal, sample_rate
+        elif sample_width == 4:
+            data = np.frombuffer(raw, dtype=np.int32)
+            signal = data.astype(float) / 2147483648.0
+        else:
+            raise ValueError(f"Unsupported sample width: {sample_width}")
+
+        if num_channels > 1:
+            data_reshaped = signal.reshape(-1, num_channels)
+            signal = data_reshaped[:, 0]
+
+        signal = signal / np.max(np.abs(signal))
+        return signal, sample_rate
+
+    def _load_mp3(self, path):
+        signal, sample_rate = librosa.load(path, sr=None, mono=True)
+        signal = signal / np.max(np.abs(signal))
+        return signal.astype(float), int(sample_rate)
+
+    def _load_spreadsheet(self, path, suffix):
+        if suffix == '.csv':
+            df = pd.read_csv(path)
+        else:
+            df = pd.read_excel(path)
+
+        if df.empty or len(df.columns) == 0:
+            raise ValueError("The spreadsheet is empty.")
+
+        cols = list(df.columns)
+        if len(cols) == 1:
+            col = cols[0]
+        else:
+            dlg = ColumnPickerDialog(cols, self)
+            if dlg.exec() != QDialog.Accepted:
+                return None, None
+            col = dlg.selected_column()
+
+        signal = df[col].dropna().to_numpy(dtype=float)
+
+        sr, ok = QInputDialog.getDouble(
+            self, "Sample Rate",
+            "Enter the sample rate (Hz):", 1000.0, 0.001, 10_000_000.0, 3
+        )
+        if not ok:
+            return None, None
+
+        return signal, sr
+
+    def _clear_plots(self):
+        self.fft_plot.clear()
+        self.signal_plot.clear()
+        self.fft_legend = self.fft_plot.addLegend()
+        self.signal_legend = self.signal_plot.addLegend()
+        self.raw_line = None
+        self.filter_line = None
+        self.fft_line = None
+        self.preview_check.setChecked(False)
+        for attr in ('low_f_line', 'high_f_line'):
+            if hasattr(self, attr):
+                delattr(self, attr)
+
+    def _refresh(self):
+        self._populate_filter_list()
+        self._apply_all_filters()
+        self._replot()
+        self._populate_legend()
+
+    def _apply_all_filters(self):
+        if self.filter_obj is None:
+            return
+        self.filter_obj._filtered = self.filter_obj._raw.copy()
+        for f_type, f_args in self.filter_obj._applied_filters:
+            self._apply_filter(filter_type=f_type, apply=False, stack=True, _args=f_args)
+
+        self._apply_fft()
+
+    def _apply_fft(self, _args=None):
+        if self.filter_obj is None:
+            return None, None
+
+        if _args is None:
+            _args = [
+                self.window_check_fft.isChecked(),
+                self.low_peak_freq_spin.value(),
+                self.high_peak_freq_spin.value(),
+                self.min_peak_amp_spin.value(),
+                self.kalman_check.isChecked(),
+                self.kalman_noise_spin.value(),
+            ]
+
+        fft_df = self.filter_obj.apply_fft(
+            window=_args[0] if isinstance(_args, (list, tuple)) else self.window_check_fft.isChecked(),
+            normalise=self.normalize_check.isChecked(),
+            fft_mode=self.fft_mode_combo.currentText(),
+        )
+
+        if 'FFT Raw Frequency' not in fft_df.columns:
+            return None, None
+
+        freq = fft_df['FFT Raw Frequency'].to_numpy()
+        amp = fft_df['FFT Raw Amplitude'].to_numpy()
+
+        if self.fft_line is None:
+            self.fft_line = self.fft_plot.plot(
+                freq, amp,
+                pen=pg.mkPen(color='m', width=2), name="FFT"
+            )
+            self.fft_line.setDownsampling(auto=True, method='peak')
+            self.fft_line.setClipToView(True)
+        else:
+            self.fft_line.setData(x=freq, y=amp)
+
+        try:
+            ifft_filter, low_f, high_f, high_freq_range_start, kalman_args = \
+                self.filter_obj.find_raw_peaks(_args)
+        except Exception as e:
+            print(f"Peak detection error: {e}")
+            return None, None
+
+        self._draw_peak_lines(low_f, high_f, high_freq_range_start)
+        return ifft_filter, kalman_args
+
+    def _apply_fft_handler(self):
+        self._apply_fft([
+            self.window_check_fft.isChecked(),
+            self.low_peak_freq_spin.value(),
+            self.high_peak_freq_spin.value(),
+            self.min_peak_amp_spin.value(),
+            self.kalman_check.isChecked(),
+            self.kalman_noise_spin.value(),
+        ])
+
+    def _draw_peak_lines(self, low_f, high_f, high_freq_range_start):
+        if low_f is not None:
+            if not hasattr(self, 'low_f_line'):
+                self.low_f_line = pg.InfiniteLine(
+                    pos=low_f, angle=90,
+                    pen=pg.mkPen(color='w', width=2, style=Qt.DashLine),
+                    movable=False, label=f"Low Frequency Start: {low_f} Hz"
+                )
+                self.low_f_line.label.fill = pg.mkBrush(20, 20, 20)
+                self.low_f_line.label.color = pg.mkBrush(255, 255, 255)
+                self.low_f_line.label.orthoPos = 0.9
+                self.fft_plot.addItem(self.low_f_line)
+            else:
+                self.low_f_line.setVisible(True)
+                self.low_f_line.setPos(low_f)
+                self.low_f_line.label.setText(f"Low Frequency Start: {low_f} Hz")
+        else:
+            if hasattr(self, 'low_f_line'):
+                self.low_f_line.setVisible(False)
+
+        if high_f is not None and high_freq_range_start is not None:
+            if not hasattr(self, 'high_f_line'):
+                self.high_f_line = pg.InfiniteLine(
+                    pos=high_freq_range_start, angle=90,
+                    pen=pg.mkPen(color='w', width=2, style=Qt.DashLine),
+                    movable=False, label=f"High Frequency Start: {high_f} kHz"
+                )
+                self.high_f_line.label.fill = pg.mkBrush(20, 20, 20)
+                self.high_f_line.label.color = pg.mkBrush(255, 255, 255)
+                self.high_f_line.label.orthoPos = 0.75
+                self.fft_plot.addItem(self.high_f_line)
+            else:
+                self.high_f_line.setVisible(True)
+                self.high_f_line.setPos(high_freq_range_start)
+                self.high_f_line.label.setText(f"High Frequency Start: {high_f} kHz")
+        else:
+            if hasattr(self, 'high_f_line'):
+                self.high_f_line.setVisible(False)
+
+        self.fft_plot.update()
+
+    def _apply_filter(self, filter_type: str, apply=False, stack=False, _args=None):
+        if self.filter_obj is None:
+            return
+
+        sample_rate = 1.0 / (self.filter_obj._time[1] - self.filter_obj._time[0]) \
+            if len(self.filter_obj._time) > 1 else 1.0
+
+        if stack:
+            _signal = self.filter_obj._filtered
+        else:
+            _signal = self.filter_obj._raw
+
+        signal_series = pd.Series(_signal)
+
+        if filter_type == "IFFT / Kalman Filter":
+            ifft_args = _args if _args is not None else [
+                self.window_check_fft.isChecked(),
+                self.low_peak_freq_spin.value(),
+                self.high_peak_freq_spin.value(),
+                self.min_peak_amp_spin.value(),
+                self.kalman_check.isChecked(),
+                self.kalman_noise_spin.value(),
+            ]
+            result, kalman_args = self._apply_fft(_args=ifft_args)
+            if result is None:
+                return
+
+            if self.window_check_filter.isChecked():
+                win = np.hanning(len(result))
+                result = result * win
+
+            result = self.filter_obj.normalise_custom(result)
+            self.filter_obj._filtered = result
+
+            if apply:
+                self.filter_obj._applied_filters.append((filter_type, kalman_args))
+            return
+
+        if _args is not None:
+            window_arg = _args[-1]
+            core_args = _args[:-1]
+            low_freq, high_freq, order = core_args[0], core_args[1], core_args[2]
+        else:
+            window_arg = self.window_check_filter.isChecked()
+            low_freq = self.filter_low_spin.value()
+            high_freq = self.filter_high_spin.value()
+            order = self.filter_order_spin.value()
+
+        result = Filters.apply_standard_filter(signal_series, sample_rate, filter_type, low_freq, high_freq, int(order))
+        if result is None:
+            return
+
+        if window_arg:
+            win = np.hanning(len(result))
+            result = result * win
+
+        result = self.filter_obj.normalise_custom(result)
+        self.filter_obj._filtered = pd.Series(result)
+
+        if apply:
+            self.filter_obj._applied_filters.append(
+                (filter_type, [low_freq, high_freq, order, window_arg])
+            )
+
+    def _apply_filter_preview(self):
+        if self.filter_obj is None:
+            return
+        self.filter_obj._filtered = self.filter_obj._raw.copy()
+        for f_type, f_args in self.filter_obj._applied_filters:
+            self._apply_filter(filter_type=f_type, apply=False, stack=True, _args=f_args)
+        self._apply_filter(filter_type=self.filter_combo.currentText(), apply=False, stack=True)
+        self._replot()
+        self._populate_legend()
+
+    def _apply_filter_committed(self):
+        if self.filter_obj is None:
+            return
+        self._apply_filter(filter_type=self.filter_combo.currentText(), apply=True, stack=False)
+        self.preview_check.setChecked(False)
+        self._refresh()
+
+    def _clear_filters(self, clear_all=False):
+        if self.filter_obj is None:
+            return
+        self.filter_obj._applied_filters = []
+        self.filter_obj._filtered = self.filter_obj._raw.copy()
+        self.preview_check.setChecked(False)
+        self._refresh()
+
+    def _populate_filter_list(self):
+        self.filter_tree.clear()
+        if self.filter_obj is None:
+            return
+        for f_type, f_args in self.filter_obj._applied_filters:
+            item = QTreeWidgetItem([str(f_type), str(f_args)])
+            self.filter_tree.addTopLevelItem(item)
+
+    def _replot(self):
+        if self.filter_obj is None:
+            return
+        time = self.filter_obj._time
+        raw = np.asarray(self.filter_obj._raw)
+        filtered = np.asarray(self.filter_obj._filtered)
+
+        if self.raw_line is None:
+            self.raw_line = self.signal_plot.plot(
+                time, raw,
+                pen=pg.mkPen(color='b', width=2), name="Raw"
+            )
+            self.filter_line = self.signal_plot.plot(
+                time, filtered,
+                pen=pg.mkPen(color='r', width=2), name="Filtered"
+            )
+            for line in (self.raw_line, self.filter_line):
+                line.setDownsampling(auto=True, method='peak')
+                line.setClipToView(True)
+            self.signal_plot.setYRange(-1.4, 1.4)
+        else:
+            self.raw_line.setData(x=time, y=raw)
+            if len(filtered) == len(time):
+                self.filter_line.setData(x=time, y=filtered)
+
+        self._handle_plot_visible('raw')
+        self._handle_plot_visible('filtered')
+
+    def _handle_filters_visible(self, state, signal: str):
+        if signal == 'raw':
+            self._raw_filter_visible = state
+        elif signal == 'filtered':
+            self._filtered_filter_visible = state
+        self._handle_plot_visible(signal)
+
+    def _handle_plot_visible(self, signal: str):
+        for item in self.signal_plot.listDataItems():
+            if hasattr(item, 'name') and item.name():
+                if item.name() == 'Raw' and signal == 'raw':
+                    item.setVisible(self._raw_filter_visible)
+                elif item.name() == 'Filtered' and signal == 'filtered':
+                    item.setVisible(self._filtered_filter_visible)
+        self._populate_legend()
+
+    def _populate_legend(self):
+        if self.signal_legend:
+            self.signal_legend.clear()
+        if self.fft_legend:
+            self.fft_legend.clear()
+
+        for item in self.signal_plot.listDataItems():
+            if item.isVisible() and hasattr(item, 'name') and item.name():
+                self.signal_legend.addItem(item, item.name())
+
+        for item in self.fft_plot.listDataItems():
+            if item.isVisible() and hasattr(item, 'name') and item.name():
+                self.fft_legend.addItem(item, item.name())
+
+
+def main():
+    pg.setConfigOptions(antialias=False)
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
+
+
+if __name__ == '__main__':
+    main()

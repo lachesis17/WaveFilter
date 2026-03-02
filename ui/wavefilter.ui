@@ -1,0 +1,629 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1400</width>
+    <height>860</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>900</width>
+    <height>600</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>WaveFilter</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout_main">
+    <item>
+     <widget class="QSplitter" name="main_splitter">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <property name="handleWidth">
+       <number>10</number>
+      </property>
+      <property name="childrenCollapsible">
+       <bool>true</bool>
+      </property>
+      <widget class="QSplitter" name="plot_splitter">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="handleWidth">
+        <number>10</number>
+       </property>
+       <property name="childrenCollapsible">
+        <bool>true</bool>
+       </property>
+       <widget class="PlotWidget" name="fft_plot" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>2</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>400</width>
+          <height>180</height>
+         </size>
+        </property>
+       </widget>
+       <widget class="PlotWidget" name="signal_plot" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>3</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>400</width>
+          <height>260</height>
+         </size>
+        </property>
+       </widget>
+      </widget>
+      <widget class="QScrollArea" name="control_scroll">
+       <property name="minimumSize">
+        <size>
+         <width>280</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>360</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="horizontalScrollBarPolicy">
+        <enum>Qt::ScrollBarAlwaysOff</enum>
+       </property>
+       <property name="widgetResizable">
+        <bool>true</bool>
+       </property>
+       <widget class="QWidget" name="scroll_contents">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>395</width>
+          <height>879</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_panel">
+         <item>
+          <widget class="QGroupBox" name="file_group">
+           <property name="title">
+            <string>File</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_file">
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_file_buttons">
+              <item>
+               <widget class="QPushButton" name="open_button">
+                <property name="text">
+                 <string>Open File</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="generate_button">
+                <property name="text">
+                 <string>Generate Test Signal</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QLabel" name="file_label">
+              <property name="text">
+               <string>No file loaded</string>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="fft_group">
+           <property name="title">
+            <string>FFT</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_fft">
+            <property name="spacing">
+             <number>4</number>
+            </property>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_fft_checks">
+              <item>
+               <widget class="QCheckBox" name="normalize_check">
+                <property name="text">
+                 <string>Normalize</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QCheckBox" name="window_check_fft">
+                <property name="text">
+                 <string>Hanning Window</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QFormLayout" name="formLayout_fft_mode">
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_fft_mode">
+                <property name="text">
+                 <string>FFT Mode</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QComboBox" name="fft_mode_combo">
+                <item>
+                 <property name="text">
+                  <string>FFT - Fast Fourier Transform</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>IFFT - Inverse FFT</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>RFFT - FFT of strictly real-valued sequence</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>IRFFT - Inverse of RFFT</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>HFFT - FFT of a Hermitian sequence (real spectrum)</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>IHFFT - Inverse of HFFT</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>DCT - Discrete cosine transform</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>IDCT - Inverse DCT</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>DST - Discrete sine transform</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>IDST - Inverse DST</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_freq_thresh">
+              <property name="text">
+               <string>── Frequency Thresholds ──</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignHCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QFormLayout" name="formLayout_fft_thresh">
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_low_freq">
+                <property name="text">
+                 <string>Low Frequency</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QDoubleSpinBox" name="low_peak_freq_spin">
+                <property name="prefix">
+                 <string>&lt; </string>
+                </property>
+                <property name="suffix">
+                 <string> Hz</string>
+                </property>
+                <property name="minimum">
+                 <double>0.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>999999.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>10.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>300.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="label_high_freq">
+                <property name="text">
+                 <string>High Frequency</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QDoubleSpinBox" name="high_peak_freq_spin">
+                <property name="prefix">
+                 <string>&gt; </string>
+                </property>
+                <property name="suffix">
+                 <string> Hz</string>
+                </property>
+                <property name="minimum">
+                 <double>0.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>999999.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>10.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>310.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="label_min_amp">
+                <property name="text">
+                 <string>Min Peak Amplitude</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QDoubleSpinBox" name="min_peak_amp_spin">
+                <property name="decimals">
+                 <number>2</number>
+                </property>
+                <property name="minimum">
+                 <double>0.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>1.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.010000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.150000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_kalman">
+              <item>
+               <widget class="QCheckBox" name="kalman_check">
+                <property name="text">
+                 <string>Apply Kalman Filter</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="label_kalman_noise">
+                <property name="text">
+                 <string>Noise:</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QDoubleSpinBox" name="kalman_noise_spin">
+                <property name="decimals">
+                 <number>2</number>
+                </property>
+                <property name="minimum">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>10.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.500000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QPushButton" name="apply_fft_button">
+              <property name="text">
+               <string>Apply FFT</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="plotting_group">
+           <property name="title">
+            <string>Plotting</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_plotting">
+            <item>
+             <widget class="QCheckBox" name="raw_visible_check">
+              <property name="text">
+               <string>Raw Signal</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="filtered_visible_check">
+              <property name="text">
+               <string>Filtered Signal</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="filters_group">
+           <property name="title">
+            <string>Filters</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_filters">
+            <property name="spacing">
+             <number>4</number>
+            </property>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_filter_top">
+              <item>
+               <widget class="QCheckBox" name="window_check_filter">
+                <property name="text">
+                 <string>Hanning Window</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="filter_combo">
+                <item>
+                 <property name="text">
+                  <string>Low Pass Filter</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>High Pass Filter</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Band Pass Filter</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Notch Filter</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>IFFT / Kalman Filter</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QFormLayout" name="formLayout_filter_params">
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_filter_low">
+                <property name="text">
+                 <string>Low Frequency</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QDoubleSpinBox" name="filter_low_spin">
+                <property name="suffix">
+                 <string> Hz</string>
+                </property>
+                <property name="minimum">
+                 <double>10.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>10000.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>10.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>150.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="label_filter_high">
+                <property name="text">
+                 <string>High Frequency</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QDoubleSpinBox" name="filter_high_spin">
+                <property name="suffix">
+                 <string> Hz</string>
+                </property>
+                <property name="minimum">
+                 <double>11.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>10000.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>10.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>250.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="label_filter_order">
+                <property name="text">
+                 <string>Order</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QSpinBox" name="filter_order_spin">
+                <property name="minimum">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <number>20</number>
+                </property>
+                <property name="value">
+                 <number>1</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QTreeWidget" name="filter_tree">
+              <property name="alternatingRowColors">
+               <bool>true</bool>
+              </property>
+              <column>
+               <property name="text">
+                <string>Filter</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>Parameters</string>
+               </property>
+              </column>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_filter_actions">
+              <item>
+               <widget class="QCheckBox" name="preview_check">
+                <property name="text">
+                 <string>Preview</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="clear_button">
+                <property name="text">
+                 <string>Clear</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="apply_filter_button">
+                <property name="text">
+                 <string>Apply Filter</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QPushButton" name="clear_all_button">
+              <property name="text">
+               <string>Clear All Filters</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="info_label">
+           <property name="styleSheet">
+            <string>color: gray;</string>
+           </property>
+           <property name="text">
+            <string>Open a file to begin.</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>pyqtgraph</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>
