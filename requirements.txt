@@ -6,3 +6,4 @@ pandas
 openpyxl
 librosa
 filterpy
+auto-py-to-exe

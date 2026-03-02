@@ -352,7 +352,7 @@ class Ui_MainWindow(object):
         self.ripple_spin.setObjectName(u"ripple_spin")
         self.ripple_spin.setDecimals(1)
         self.ripple_spin.setMinimum(0.100000000000000)
-        self.ripple_spin.setMaximum(20.000000000000000)
+        self.ripple_spin.setMaximum(120.000000000000000)
         self.ripple_spin.setSingleStep(0.100000000000000)
         self.ripple_spin.setValue(3.000000000000000)
 
@@ -366,7 +366,7 @@ class Ui_MainWindow(object):
         self.attenuation_spin = QDoubleSpinBox(self.filters_group)
         self.attenuation_spin.setObjectName(u"attenuation_spin")
         self.attenuation_spin.setDecimals(1)
-        self.attenuation_spin.setMinimum(1.000000000000000)
+        self.attenuation_spin.setMinimum(0.100000000000000)
         self.attenuation_spin.setMaximum(120.000000000000000)
         self.attenuation_spin.setSingleStep(0.100000000000000)
         self.attenuation_spin.setValue(20.000000000000000)
