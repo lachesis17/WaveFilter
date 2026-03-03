@@ -72,20 +72,30 @@ pyside6-uic ui/wavefilter.ui | Out-File -FilePath ui/wavefilter_ui.py
 
 ---
 
-## Compiling to .exe
+## Compiling
+
+Both OS versions will compile to `/output` dir.
+
+### Windows
 
 Uses [auto-py-to-exe](https://github.com/brentvollebregt/auto-py-to-exe) with the config in `compile/`.
 
-### batch script (recommended)
+The batch file changes dir to the project root before launching auto-py-to-exe, using the `wavefilter-autopytoexe.json` as a saved config with relative paths.
+```
+./compile/compile.bat
+```
 
-Run `compile/compile.bat` from anywhere. It changes dir to the project root before launching auto-py-to-exe, using the `wavefilter-autopytoexe.json` as a saved config with relative paths.
-
-### manual
-
-Run from the **project root directory** so relative paths in the config resolve correctly:
+Or manually from the project root dir:
 
 ```
 auto-py-to-exe --config compile/wavefilter-autopytoexe.json
+```
+
+### macOS
+
+The shell script replaces icon files for macOS, recompiles the ui as well as an inline temp python hook to handle relative paths when compiled on mac through pyinstaller.
+```
+./compile/compile_mac.sh
 ```
 
 ---
@@ -99,4 +109,3 @@ Just download the `*.7z` zip from [releases](https://github.com/lachesis17/WaveF
 https://github.com/user-attachments/assets/886a6ad0-9bb2-4962-a376-e0cd3b3d0077
 
 *Playback support demo with filters applied: low-pass, high-pass, band-pass, band-stop*
-

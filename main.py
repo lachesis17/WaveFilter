@@ -1,6 +1,7 @@
 import ctypes
 import sys
 import wave
+import platform
 from pathlib import Path
 
 import librosa
@@ -20,7 +21,8 @@ from src.helpers import PlaybackLine, FileLoadWorker, FilterWorker, ColumnPicker
 from ui.wavefilter_ui import Ui_MainWindow
 
 appid = 'WaveFilter'
-ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appid)
+if platform.system() == 'Windows':
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appid)
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -50,7 +52,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._filter_thread = None
         self._filter_worker = None
 
-        self.setWindowIcon(QIcon('ui/icon.ico'))
+        if platform.system() == 'Windows':
+            self.setWindowIcon(QIcon('ui/icon.ico'))
+        elif platform.system() == 'Darwin':
+            self.setWindowIcon(QIcon('ui/icon.icns'))
+        else:
+            self.setWindowIcon(QIcon('ui/icon.png'))
 
         self._setup_plots()
         self._connect_signals()
