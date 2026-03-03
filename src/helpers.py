@@ -5,9 +5,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QLabel,
                                QVBoxLayout)
 
-# max num samples for pyqtgraph, signal above this is decimated with
-# an anti-aliasing filter on the worker thread before loading into UI
-MAX_SAMPLES = 200_000
+MAX_SAMPLES = 500_000
 
 
 def decimate_signal(signal, sample_rate) -> tuple[np.ndarray, int]:
@@ -58,7 +56,7 @@ class FileLoadWorker(QObject):
     """
     Worker to async load a file in a separate thread.
     """
-    finished = Signal(object)  # (signal_array, sample_rate)
+    finished = Signal(object)  # (full_signal, full_rate, display_signal, display_rate)
     error = Signal(str)
 
     def __init__(self, loader_func, path):
@@ -69,8 +67,8 @@ class FileLoadWorker(QObject):
     def run(self):
         try:
             signal, sample_rate = self._loader_func(self._path)
-            signal, sample_rate = decimate_signal(signal, sample_rate)
-            self.finished.emit((signal, sample_rate))
+            display_signal, display_rate = decimate_signal(signal, sample_rate)
+            self.finished.emit((signal, sample_rate, display_signal, display_rate))
         except Exception as e:
             print(e)
             self.error.emit(str(e))

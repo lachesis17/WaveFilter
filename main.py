@@ -6,7 +6,8 @@ from pathlib import Path
 import librosa
 import numpy as np
 import pandas as pd
-from PySide6.QtCore import Qt, QThread
+import sounddevice as sd
+from PySide6.QtCore import Qt, QThread, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog,
                                QInputDialog, QLabel, QMainWindow, QMessageBox,
@@ -63,6 +64,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _connect_signals(self):
         self.open_button.clicked.connect(self._load_file)
         self.generate_button.clicked.connect(self._generate_test_signal)
+        self.play_button.clicked.connect(self._play_audio)
+        self.stop_button.clicked.connect(self._stop_audio)
         self.apply_fft_button.clicked.connect(self._apply_fft_handler)
         self.apply_filter_button.clicked.connect(self._apply_filter_committed)
         self.clear_button.clicked.connect(self._clear_filters)
@@ -213,8 +216,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         thread.start()
 
     def _on_file_loaded(self, result):
-        signal_arr, sample_rate = result
-        self._finish_load(self._pending_load_path, signal_arr, sample_rate)
+        full_signal, full_rate, display_signal, display_rate = result
+        self._finish_load(self._pending_load_path, display_signal, display_rate, full_signal, full_rate)
         self._load_dialog.close()
         self._load_thread.quit()
 
@@ -223,7 +226,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         QMessageBox.critical(self, "Load error", msg)
         self._load_thread.quit()
 
-    def _finish_load(self, path, signal, sample_rate):
+    def _finish_load(self, path, signal, sample_rate, full_signal=None, full_rate=None):
         n = len(signal)
         time = np.arange(n) / sample_rate
 
@@ -232,6 +235,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         fo._filtered = fo._raw.copy()
         fo._time = time
         fo._applied_filters = []
+        fo._raw_full = (full_signal if full_signal is not None else signal).astype(float)
+        fo._rate_full = int(full_rate if full_rate is not None else sample_rate)
         self.filter_obj = fo
 
         duration = n / sample_rate
@@ -242,6 +247,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self._clear_plots()
         self._refresh()
+        self.play_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
 
     def _generate_test_signal(self):
         """
@@ -282,6 +289,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         fo._filtered = signal.copy()
         fo._time = t
         fo._applied_filters = []
+        fo._raw_full = signal.copy()
+        fo._rate_full = sample_rate
         self.filter_obj = fo
 
         components_str = '  +  '.join(
@@ -294,6 +303,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
         self._clear_plots()
         self._refresh()
+        self.play_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
 
     def _load_wav(self, path):
         with wave.open(path, 'rb') as wf:
@@ -584,6 +595,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _apply_filter_committed(self):
         if self.filter_obj is None:
             return
+        self._stop_audio()
         self._apply_filter(filter_type=self.filter_combo.currentText(), apply=True, stack=False)
         self.preview_check.setChecked(False)
         self._refresh()
@@ -591,10 +603,59 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _clear_filters(self):
         if self.filter_obj is None:
             return
+        self._stop_audio()
         self.filter_obj._applied_filters = []
         self.filter_obj._filtered = self.filter_obj._raw.copy()
         self.preview_check.setChecked(False)
         self._refresh()
+
+    def _play_audio(self):
+        if self.filter_obj is None:
+            return
+        signal = np.asarray(self.filter_obj._raw_full, dtype=float)
+        sample_rate = self.filter_obj._rate_full
+        for f_type, f_args in self.filter_obj._applied_filters:
+            low_freq, high_freq, order = f_args[0], f_args[1], int(f_args[2])
+            filter_design = f_args[4] if len(f_args) > 4 else 'butter'
+            ripple = f_args[5] if len(f_args) > 5 else 3.0
+            attenuation = f_args[6] if len(f_args) > 6 else 60.0
+            result = Filters.apply_standard_filter(
+                signal, sample_rate, f_type, low_freq, high_freq, order,
+                filter_design, ripple, attenuation)
+            if result is not None:
+                signal = result
+        signal = np.asarray(signal, dtype=np.float32)
+        max_val = np.max(np.abs(signal))
+        if max_val > 0:
+            signal = signal / max_val
+        valid_rates = {8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000}
+        if sample_rate not in valid_rates:
+            signal = librosa.resample(signal, orig_sr=sample_rate, target_sr=22050)
+            sample_rate = 22050
+        sd.play(signal, sample_rate)
+        self.play_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
+        self._playback_timer = QTimer(self)
+        self._playback_timer.timeout.connect(self._check_playback)
+        self._playback_timer.start(100)
+
+    def _check_playback(self):
+        try:
+            if not sd.get_stream().active:
+                self._playback_timer.stop()
+                self.play_button.setEnabled(True)
+                self.stop_button.setEnabled(False)
+        except Exception:
+            self._playback_timer.stop()
+            self.play_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
+
+    def _stop_audio(self):
+        sd.stop()
+        if hasattr(self, '_playback_timer'):
+            self._playback_timer.stop()
+        self.play_button.setEnabled(self.filter_obj is not None)
+        self.stop_button.setEnabled(False)
 
     def _populate_filter_list(self):
         self.filter_tree.clear()

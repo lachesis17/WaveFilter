@@ -103,6 +103,23 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_file.addWidget(self.file_label)
 
+        self.horizontalLayout_playback = QHBoxLayout()
+        self.horizontalLayout_playback.setObjectName(u"horizontalLayout_playback")
+        self.play_button = QPushButton(self.file_group)
+        self.play_button.setObjectName(u"play_button")
+        self.play_button.setEnabled(False)
+
+        self.horizontalLayout_playback.addWidget(self.play_button)
+
+        self.stop_button = QPushButton(self.file_group)
+        self.stop_button.setObjectName(u"stop_button")
+        self.stop_button.setEnabled(False)
+
+        self.horizontalLayout_playback.addWidget(self.stop_button)
+
+
+        self.verticalLayout_file.addLayout(self.horizontalLayout_playback)
+
 
         self.verticalLayout_panel.addWidget(self.file_group)
 
@@ -431,6 +448,8 @@ class Ui_MainWindow(object):
         self.open_button.setText(QCoreApplication.translate("MainWindow", u"Open File", None))
         self.generate_button.setText(QCoreApplication.translate("MainWindow", u"Generate Test Signal", None))
         self.file_label.setText(QCoreApplication.translate("MainWindow", u"No file loaded", None))
+        self.play_button.setText(QCoreApplication.translate("MainWindow", u"\u25b6 Play", None))
+        self.stop_button.setText(QCoreApplication.translate("MainWindow", u"\u25fc Stop", None))
         self.fft_group.setTitle(QCoreApplication.translate("MainWindow", u"FFT", None))
         self.normalize_check.setText(QCoreApplication.translate("MainWindow", u"Normalize", None))
         self.window_check_fft.setText(QCoreApplication.translate("MainWindow", u"Hanning Window", None))

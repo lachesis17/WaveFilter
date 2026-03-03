@@ -6,4 +6,5 @@ pandas
 openpyxl
 librosa
 filterpy
+sounddevice
 auto-py-to-exe

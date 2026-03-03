@@ -140,6 +140,30 @@
               </property>
              </widget>
             </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_playback">
+              <item>
+               <widget class="QPushButton" name="play_button">
+                <property name="text">
+                 <string>&#9654; Play</string>
+                </property>
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="stop_button">
+                <property name="text">
+                 <string>&#9724; Stop</string>
+                </property>
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
            </layout>
           </widget>
          </item>
