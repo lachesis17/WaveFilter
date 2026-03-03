@@ -1,8 +1,10 @@
 # <img src="https://github.com/user-attachments/assets/d65cd88b-a1d4-43c9-b8f4-cbc5e2ac436b" height="28"> WaveFilter
 
-A desktop signal processing application with PySide6. Load audio or data files, visualise the raw and filtered waveforms alongside their FFT spectra and apply one or more filters in sequence with real-time previews.
+A desktop signal processing application with PySide6. Load audio or data files, visualise the raw and filtered waveforms alongside their FFT spectra and apply one or more filters in sequence with real-time previews and playback.
 
-![wavefilter](https://github.com/user-attachments/assets/5b91d5bd-d746-445e-8609-d5cccb1c99a6)
+![wavefilter](https://github.com/user-attachments/assets/fae6cdc3-1597-46fa-bb25-5a7f445315c1)
+
+---
 
 ## Features
 
@@ -12,6 +14,10 @@ A desktop signal processing application with PySide6. Load audio or data files, 
 - Real-time filter preview before applying
 - Stack and clear multiple filters
 - Optional hanning window
+- Playback audio with start/stop times and filters applied
+- Custom colors for plotted lines
+
+---
 
 ## Filter Types
 
@@ -25,7 +31,7 @@ A desktop signal processing application with PySide6. Load audio or data files, 
 | Savitzky-Golay | Window Length, Poly Order                          | Polynomial smoothing filter                                                        |
 | IFFT / Kalman  | Window, Low/High/Amplitude threshold, Kalman noise | Peak-based frequency isolation via inverse FFT, with optional Kalman pre-smoothing |
 
-### Filter Designs (IIR filters)
+## Filter Designs (IIR filters)
 
 | Design       | Parameters                | Notes                                             |
 | ------------ | ------------------------- | ------------------------------------------------- |
@@ -82,6 +88,15 @@ Run from the **project root directory** so relative paths in the config resolve 
 auto-py-to-exe --config compile/wavefilter-autopytoexe.json
 ```
 
+---
+
 ## Releases
 
 Just download the `*.7z` zip from [releases](https://github.com/lachesis17/WaveFilter/releases) and extract then run `WaveFilter.exe`. You could add a shortcut to it!
+
+---
+
+https://github.com/user-attachments/assets/886a6ad0-9bb2-4962-a376-e0cd3b3d0077
+
+*Playback support demo with filters applied: low-pass, high-pass, band-pass, band-stop*
+
