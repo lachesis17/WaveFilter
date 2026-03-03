@@ -48,3 +48,25 @@ class ConfigManager():
         self.config['last_accessed_folder']['folder'] = folder_path
         with open(CONFIG_FILE_FULL, 'w') as configfile:
             self.config.write(configfile)
+
+    def get_line_colors(self) -> dict:
+        defaults = {'raw': '200,200,200', 'filtered': '150,0,255', 'fft': '0,200,0'}
+        if 'line_colors' not in self.config:
+            return {k: tuple(int(x) for x in v.split(',')) for k, v in defaults.items()}
+        section = self.config['line_colors']
+        result = {}
+        for key, default in defaults.items():
+            raw = section.get(key, default)
+            try:
+                result[key] = tuple(int(x) for x in raw.split(','))
+            except ValueError:
+                result[key] = tuple(int(x) for x in default.split(','))
+        return result
+
+    def set_line_colors(self, colors: dict):
+        if 'line_colors' not in self.config:
+            self.config['line_colors'] = {}
+        for key, rgb in colors.items():
+            self.config['line_colors'][key] = ','.join(str(c) for c in rgb)
+        with open(CONFIG_FILE_FULL, 'w') as configfile:
+            self.config.write(configfile)

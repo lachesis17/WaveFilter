@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1400</width>
-    <height>950</height>
+    <height>975</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -108,7 +108,7 @@
           <x>0</x>
           <y>0</y>
           <width>395</width>
-          <height>930</height>
+          <height>933</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_panel">
@@ -754,6 +754,35 @@
     </item>
    </layout>
   </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1400</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuSettings">
+    <property name="title">
+     <string>Settings</string>
+    </property>
+    <addaction name="actionLine_Colors"/>
+   </widget>
+   <addaction name="menuSettings"/>
+  </widget>
+  <action name="actionLine_Colors">
+   <property name="icon">
+    <iconset>
+     <normaloff>ui/colors.ico</normaloff>ui/colors.ico</iconset>
+   </property>
+   <property name="text">
+    <string> Line Colors</string>
+   </property>
+   <property name="iconText">
+    <string> Line Colors</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>

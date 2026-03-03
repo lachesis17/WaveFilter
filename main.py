@@ -16,7 +16,7 @@ import pyqtgraph as pg
 
 from src.config import ConfigManager
 from src.filters import Filters
-from src.helpers import ColumnPickerDialog, FileLoadWorker, FilterWorker, PlaybackLine
+from src.helpers import PlaybackLine, FileLoadWorker, FilterWorker, ColumnPickerDialog, LineColorsDialog
 from ui.wavefilter_ui import Ui_MainWindow
 
 appid = 'WaveFilter'
@@ -100,6 +100,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.normalize_check.toggled.connect(self._on_filter_param_changed)
         self.window_check_fft.toggled.connect(self._on_filter_param_changed)
         self.fft_mode_combo.currentIndexChanged.connect(self._on_filter_param_changed)
+
+        self.actionLine_Colors.triggered.connect(self._open_line_colors_dialog)
 
     def _preview_toggled(self, checked):
         if not checked:
@@ -494,9 +496,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         amp = fft_df['FFT Raw Amplitude'].to_numpy()
 
         if self.fft_line is None:
+            colors = self._config_manager.get_line_colors()
             self.fft_line = self.fft_plot.plot(
                 freq, amp,
-                pen=pg.mkPen(color=(0, 200, 0), width=2), name="FFT"
+                pen=pg.mkPen(color=colors['fft'], width=2), name="FFT"
             )
             self.fft_line.setDownsampling(auto=True, method='peak')
             self.fft_line.setClipToView(True)
@@ -799,6 +802,36 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             item = QTreeWidgetItem([str(f_type), str(f_args)])
             self.filter_tree.addTopLevelItem(item)
 
+    def _open_line_colors_dialog(self):
+        original = self._config_manager.get_line_colors()
+        dlg = LineColorsDialog(original, self)
+        dlg.colorsChanged.connect(self._apply_line_colors)
+        if dlg.exec() == LineColorsDialog.Accepted:
+            self._config_manager.set_line_colors(dlg.get_colors())
+        else:
+            self._apply_line_colors(original)
+
+    def _apply_line_colors(self, colors: dict):
+        if self.raw_line is not None:
+            self.raw_line.setPen(pg.mkPen(color=colors['raw'], width=2))
+        if self.filter_line is not None:
+            self.filter_line.setPen(pg.mkPen(color=colors['filtered'], width=2))
+        if self.fft_line is not None:
+            self.fft_line.setPen(pg.mkPen(color=colors['fft'], width=2))
+
+    def _reset_plot_lines(self):
+        if self.raw_line is not None:
+            self.signal_plot.removeItem(self.raw_line)
+            self.raw_line = None
+        if self.filter_line is not None:
+            self.signal_plot.removeItem(self.filter_line)
+            self.filter_line = None
+        if self.fft_line is not None:
+            self.fft_plot.removeItem(self.fft_line)
+            self.fft_line = None
+        self._replot()
+        self._apply_fft()
+
     def _replot(self):
         if self.filter_obj is None:
             return
@@ -807,13 +840,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         filtered = np.asarray(self.filter_obj._filtered)
 
         if self.raw_line is None:
+            colors = self._config_manager.get_line_colors()
             self.raw_line = self.signal_plot.plot(
                 time, raw,
-                pen=pg.mkPen(color=(200, 200, 200), width=2), name="Raw"
+                pen=pg.mkPen(color=colors['raw'], width=2), name="Raw"
             )
             self.filter_line = self.signal_plot.plot(
                 time, filtered,
-                pen=pg.mkPen(color=(150, 0, 255), width=2), name="Filtered"
+                pen=pg.mkPen(color=colors['filtered'], width=2), name="Filtered"
             )
             for line in (self.raw_line, self.filter_line):
                 line.setDownsampling(auto=True, method='peak')

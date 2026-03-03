@@ -11,15 +11,17 @@
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
     QSize, QTime, QUrl, Qt)
-from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
-    QFont, QFontDatabase, QGradient, QIcon,
-    QImage, QKeySequence, QLinearGradient, QPainter,
-    QPalette, QPixmap, QRadialGradient, QTransform)
+from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
+    QCursor, QFont, QFontDatabase, QGradient,
+    QIcon, QImage, QKeySequence, QLinearGradient,
+    QPainter, QPalette, QPixmap, QRadialGradient,
+    QTransform)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox,
     QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
-    QLabel, QMainWindow, QPushButton, QScrollArea,
-    QSizePolicy, QSpinBox, QSplitter, QTreeWidget,
-    QTreeWidgetItem, QVBoxLayout, QWidget)
+    QLabel, QMainWindow, QMenu, QMenuBar,
+    QPushButton, QScrollArea, QSizePolicy, QSpinBox,
+    QSplitter, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
+    QWidget)
 
 from pyqtgraph import PlotWidget
 
@@ -27,8 +29,13 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(1400, 950)
+        MainWindow.resize(1400, 975)
         MainWindow.setMinimumSize(QSize(900, 600))
+        self.actionLine_Colors = QAction(MainWindow)
+        self.actionLine_Colors.setObjectName(u"actionLine_Colors")
+        icon = QIcon()
+        icon.addFile(u"ui/colors.ico", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.actionLine_Colors.setIcon(icon)
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.horizontalLayout_main = QHBoxLayout(self.centralwidget)
@@ -80,7 +87,7 @@ class Ui_MainWindow(object):
         self.control_scroll.setWidgetResizable(True)
         self.scroll_contents = QWidget()
         self.scroll_contents.setObjectName(u"scroll_contents")
-        self.scroll_contents.setGeometry(QRect(0, 0, 395, 930))
+        self.scroll_contents.setGeometry(QRect(0, 0, 395, 933))
         self.verticalLayout_panel = QVBoxLayout(self.scroll_contents)
         self.verticalLayout_panel.setObjectName(u"verticalLayout_panel")
         self.file_group = QGroupBox(self.scroll_contents)
@@ -448,6 +455,15 @@ class Ui_MainWindow(object):
         self.horizontalLayout_main.addWidget(self.main_splitter)
 
         MainWindow.setCentralWidget(self.centralwidget)
+        self.menuBar = QMenuBar(MainWindow)
+        self.menuBar.setObjectName(u"menuBar")
+        self.menuBar.setGeometry(QRect(0, 0, 1400, 22))
+        self.menuSettings = QMenu(self.menuBar)
+        self.menuSettings.setObjectName(u"menuSettings")
+        MainWindow.setMenuBar(self.menuBar)
+
+        self.menuBar.addAction(self.menuSettings.menuAction())
+        self.menuSettings.addAction(self.actionLine_Colors)
 
         self.retranslateUi(MainWindow)
 
@@ -456,6 +472,8 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"WaveFilter", None))
+        self.actionLine_Colors.setText(QCoreApplication.translate("MainWindow", u" Line Colors", None))
+        self.actionLine_Colors.setIconText(QCoreApplication.translate("MainWindow", u" Line Colors", None))
         self.file_group.setTitle(QCoreApplication.translate("MainWindow", u"File", None))
         self.open_button.setText(QCoreApplication.translate("MainWindow", u"Open File", None))
         self.generate_button.setText(QCoreApplication.translate("MainWindow", u"Generate Test Signal", None))
@@ -525,5 +543,6 @@ class Ui_MainWindow(object):
         self.apply_filter_button.setText(QCoreApplication.translate("MainWindow", u"Apply Filter", None))
         self.info_label.setStyleSheet(QCoreApplication.translate("MainWindow", u"color: gray;", None))
         self.info_label.setText(QCoreApplication.translate("MainWindow", u"Open a file to begin.", None))
+        self.menuSettings.setTitle(QCoreApplication.translate("MainWindow", u"Settings", None))
     # retranslateUi
 

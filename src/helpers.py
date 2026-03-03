@@ -2,8 +2,10 @@ import numpy as np
 import math
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QLabel,
-                               QVBoxLayout)
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (QColorDialog, QComboBox, QDialog,
+                               QDialogButtonBox, QFormLayout, QLabel,
+                               QPushButton, QVBoxLayout)
 import pyqtgraph as pg
 
 # max num samples for pyqtgraph, signal above this is decimated with
@@ -53,6 +55,80 @@ class ColumnPickerDialog(QDialog):
 
     def selected_column(self):
         return self.combo.currentText()
+
+
+class LineColorsDialog(QDialog):
+    """
+    Dialog to pick colors for raw, filtered, and FFT plot lines.
+    Colors are tuples of (r, g, b).
+    Emits colorsChanged(dict) on color update.
+    """
+    colorsChanged = Signal(dict)
+
+    def __init__(self, current_colors: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Line Colors")
+        self.setMinimumWidth(300)
+        self._colors = dict(current_colors)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self._buttons = {}
+        for key, label in (('raw', 'Raw signal'), ('filtered', 'Filtered signal'), ('fft', 'FFT')):
+            btn = QPushButton()
+            btn.setFixedHeight(28)
+            self._update_button(btn, self._colors[key])
+            btn.clicked.connect(lambda _, k=key, b=btn: self._pick_color(k, b))
+            form.addRow(label + ':', btn)
+            self._buttons[key] = btn
+
+        layout.addLayout(form)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        reset_btn = buttons.addButton("Reset to defaults", QDialogButtonBox.ResetRole)
+        reset_btn.setMinimumWidth(125)
+        reset_btn.clicked.connect(self._reset_defaults)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _update_button(self, btn: QPushButton, rgb: tuple):
+        r, g, b = rgb
+        luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        text_color = '#000000' if luminance > 128 else '#ffffff'
+        btn.setStyleSheet(
+            f'background-color: rgb({r},{g},{b}); color: {text_color};'
+        )
+        btn.setText(f'rgb({r}, {g}, {b})')
+
+    def _reset_defaults(self):
+        defaults = {'raw': (200, 200, 200), 'filtered': (150, 0, 255), 'fft': (0, 200, 0)}
+        for key, rgb in defaults.items():
+            self._colors[key] = rgb
+            self._update_button(self._buttons[key], rgb)
+        self.colorsChanged.emit(dict(self._colors))
+
+    def _pick_color(self, key: str, btn: QPushButton):
+        original = self._colors[key]
+        dlg = QColorDialog(QColor(*original), self)
+        dlg.setOption(QColorDialog.ColorDialogOption.DontUseNativeDialog)
+        dlg.setWindowTitle(f'Pick color — {key}')
+
+        def on_live(color):
+            rgb = (color.red(), color.green(), color.blue())
+            self._colors[key] = rgb
+            self._update_button(btn, rgb)
+            self.colorsChanged.emit(dict(self._colors))
+
+        dlg.currentColorChanged.connect(on_live)
+
+        if dlg.exec() != QColorDialog.Accepted:
+            self._colors[key] = original
+            self._update_button(btn, original)
+            self.colorsChanged.emit(dict(self._colors))
+
+    def get_colors(self) -> dict:
+        return dict(self._colors)
 
 
 class FilterWorker(QObject):
