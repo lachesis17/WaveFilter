@@ -5,7 +5,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QLabel,
                                QVBoxLayout)
 
-MAX_SAMPLES = 500_000
+MAX_SAMPLES = 5_000_000
 
 
 def decimate_signal(signal, sample_rate) -> tuple[np.ndarray, int]:
@@ -50,6 +50,45 @@ class ColumnPickerDialog(QDialog):
 
     def selected_column(self):
         return self.combo.currentText()
+
+
+class FilterWorker(QObject):
+    """
+    Worker to apply a standard filter in a separate thread.
+    """
+    finished = Signal(object)  # tuple of filter params and result
+    error = Signal(str)
+
+    def __init__(self, signal, sample_rate, filter_type,
+                 low_freq, high_freq, order,
+                 filter_design, ripple, attenuation, window_arg):
+        super().__init__()
+        self._signal = signal
+        self._sample_rate = sample_rate
+        self._filter_type = filter_type
+        self._low_freq = low_freq
+        self._high_freq = high_freq
+        self._order = order
+        self._filter_design = filter_design
+        self._ripple = ripple
+        self._attenuation = attenuation
+        self._window_arg = window_arg
+
+    def run(self):
+        try:
+            from src.filters import Filters
+            result = Filters.apply_standard_filter(
+                self._signal, self._sample_rate, self._filter_type,
+                self._low_freq, self._high_freq, int(self._order),
+                self._filter_design, self._ripple, self._attenuation,
+            )
+            self.finished.emit((result, self._filter_type,
+                                self._low_freq, self._high_freq, self._order,
+                                self._window_arg, self._filter_design,
+                                self._ripple, self._attenuation))
+        except Exception as e:
+            print(e)
+            self.error.emit(str(e))
 
 
 class FileLoadWorker(QObject):

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import scipy.fft as fft
 from filterpy.kalman import KalmanFilter
-from scipy.signal import filtfilt, find_peaks, iirfilter, iirnotch, savgol_filter
+from scipy.signal import filtfilt, find_peaks, iirfilter, iirnotch, savgol_filter, sosfiltfilt
 
 
 class Filters:
@@ -207,21 +207,22 @@ class Filters:
             try:
                 if filter_type == "Notch Filter":
                     b, a = iirnotch(w0=freq, Q=10, fs=sample_rate)
+                    return filtfilt(b, a, data)
                 elif filter_type == "Band Pass Filter":
-                    b, a = iirfilter(ord_, Wn=freq, fs=sample_rate, btype='bandpass',
-                                     ftype=filter_design, **_ripple_kwargs())
+                    sos = iirfilter(ord_, Wn=freq, fs=sample_rate, btype='bandpass',
+                                    ftype=filter_design, output='sos', **_ripple_kwargs())
                 elif filter_type == "Band Stop Filter":
-                    b, a = iirfilter(ord_, Wn=freq, fs=sample_rate, btype='bandstop',
-                                     ftype=filter_design, **_ripple_kwargs())
+                    sos = iirfilter(ord_, Wn=freq, fs=sample_rate, btype='bandstop',
+                                    ftype=filter_design, output='sos', **_ripple_kwargs())
                 elif filter_type == "Low Pass Filter":
-                    b, a = iirfilter(ord_, Wn=freq, fs=sample_rate, btype='lowpass',
-                                     ftype=filter_design, **_ripple_kwargs())
+                    sos = iirfilter(ord_, Wn=freq, fs=sample_rate, btype='lowpass',
+                                    ftype=filter_design, output='sos', **_ripple_kwargs())
                 elif filter_type == "High Pass Filter":
-                    b, a = iirfilter(ord_, Wn=freq, fs=sample_rate, btype='highpass',
-                                     ftype=filter_design, **_ripple_kwargs())
+                    sos = iirfilter(ord_, Wn=freq, fs=sample_rate, btype='highpass',
+                                    ftype=filter_design, output='sos', **_ripple_kwargs())
                 else:
                     return None
-                return filtfilt(b, a, data, method='gust')
+                return sosfiltfilt(sos, data)
             except ValueError as e:
                 print(f"Filter error: {e}")
                 return None

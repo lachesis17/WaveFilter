@@ -16,7 +16,7 @@ import pyqtgraph as pg
 
 from src.config import ConfigManager
 from src.filters import Filters
-from src.helpers import ColumnPickerDialog, FileLoadWorker
+from src.helpers import ColumnPickerDialog, FileLoadWorker, FilterWorker
 from ui.wavefilter_ui import Ui_MainWindow
 
 appid = 'WaveFilter'
@@ -43,6 +43,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._pending_load_path = None
         self._load_thread = None
         self._load_worker = None
+
+        # held state across async filtering
+        self._filter_thread = None
+        self._filter_worker = None
 
         self.setWindowIcon(QIcon('ui/icon.ico'))
 
@@ -504,12 +508,32 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.fft_plot.update()
 
+    def _get_sample_rate(self):
+        t = self.filter_obj._time
+        return 1.0 / (t[1] - t[0]) if len(t) > 1 else 1.0
+
+    def _get_filter_params(self):
+        return (
+            self.window_check_filter.isChecked(),
+            self.filter_low_spin.value(),
+            self.filter_high_spin.value(),
+            self.filter_order_spin.value(),
+            {
+                "Butterworth": "butter",
+                "Chebyshev I": "cheby1",
+                "Chebyshev II": "cheby2",
+                "Elliptic": "ellip",
+                "Bessel": "bessel",
+            }.get(self.filter_design_combo.currentText(), "butter"),
+            self.ripple_spin.value(),
+            self.attenuation_spin.value(),
+        )
+
     def _apply_filter(self, filter_type: str, apply=False, stack=False, _args=None):
         if self.filter_obj is None:
             return
 
-        sample_rate = 1.0 / (self.filter_obj._time[1] - self.filter_obj._time[0]) \
-            if len(self.filter_obj._time) > 1 else 1.0
+        sample_rate = self._get_sample_rate()
 
         if stack:
             _signal = self.filter_obj._filtered
@@ -548,19 +572,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ripple = _args[5] if len(_args) > 5 else 3.0
             attenuation = _args[6] if len(_args) > 6 else 60.0
         else:
-            window_arg = self.window_check_filter.isChecked()
-            low_freq = self.filter_low_spin.value()
-            high_freq = self.filter_high_spin.value()
-            order = self.filter_order_spin.value()
-            filter_design = {
-                "Butterworth": "butter",
-                "Chebyshev I": "cheby1",
-                "Chebyshev II": "cheby2",
-                "Elliptic": "ellip",
-                "Bessel": "bessel",
-            }.get(self.filter_design_combo.currentText(), "butter")
-            ripple = self.ripple_spin.value()
-            attenuation = self.attenuation_spin.value()
+            window_arg, low_freq, high_freq, order, filter_design, ripple, attenuation = self._get_filter_params()
 
         result = Filters.apply_standard_filter(
             signal_series, sample_rate, filter_type, low_freq, high_freq, int(order),
@@ -596,9 +608,68 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.filter_obj is None:
             return
         self._stop_audio()
-        self._apply_filter(filter_type=self.filter_combo.currentText(), apply=True, stack=False)
-        self.preview_check.setChecked(False)
-        self._refresh()
+        filter_type = self.filter_combo.currentText()
+
+        if filter_type == "IFFT / Kalman Filter":
+            self._apply_filter(filter_type=filter_type, apply=True, stack=False)
+            self.preview_check.setChecked(False)
+            self._refresh()
+            return
+
+        sample_rate = self._get_sample_rate()
+        signal = np.asarray(self.filter_obj._raw, dtype=float)
+        window_arg, low_freq, high_freq, order, filter_design, ripple, attenuation = self._get_filter_params()
+
+        self.apply_filter_button.setEnabled(False)
+        self.apply_filter_button.setText("Applying...")
+
+        thread = QThread()
+        worker = FilterWorker(signal, sample_rate, filter_type,
+                              low_freq, high_freq, order,
+                              filter_design, ripple, attenuation, window_arg)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(thread.quit)  # stop thread event loop on finish
+        worker.finished.connect(self._on_filter_done, Qt.ConnectionType.QueuedConnection)
+        worker.error.connect(self._on_filter_error, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._filter_thread = thread
+        self._filter_worker = worker
+        thread.start()
+
+    def _on_filter_done(self, payload):
+        result, filter_type, low_freq, high_freq, order, window_arg, filter_design, ripple, attenuation = payload
+        if self._filter_thread is not None:
+            self._filter_thread.quit()
+            self._filter_thread.wait()  # block until thread stops before dropping references
+            self._filter_thread = None
+            self._filter_worker = None
+        if result is not None:
+            if window_arg:
+                win = np.hanning(len(result))
+                result = result * win
+            result = self.filter_obj.normalise_custom(result)
+            self.filter_obj._applied_filters.append(
+                (filter_type, [round(low_freq, 1), round(high_freq, 1), order, window_arg,
+                               filter_design, round(ripple, 1), round(attenuation, 1)])
+            )
+            self.preview_check.blockSignals(True)
+            self.preview_check.setChecked(False)
+            self.preview_check.blockSignals(False)
+            self._refresh()
+        self.apply_filter_button.setEnabled(True)
+        self.apply_filter_button.setText("Apply Filter")
+
+    def _on_filter_error(self, msg):
+        if self._filter_thread is not None:
+            self._filter_thread.quit()
+            self._filter_thread.wait()
+            self._filter_thread = None
+            self._filter_worker = None
+        self.apply_filter_button.setEnabled(True)
+        self.apply_filter_button.setText("Apply Filter")
+        QMessageBox.critical(self, "Filter error", msg)
 
     def _clear_filters(self):
         if self.filter_obj is None:
