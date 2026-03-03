@@ -4,7 +4,10 @@ import math
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QLabel,
                                QVBoxLayout)
+import pyqtgraph as pg
 
+# max num samples for pyqtgraph, signal above this is decimated with
+# an anti-aliasing filter on the worker thread before loading into UI
 MAX_SAMPLES = 5_000_000
 
 
@@ -111,3 +114,11 @@ class FileLoadWorker(QObject):
         except Exception as e:
             print(e)
             self.error.emit(str(e))
+
+
+class PlaybackLine(pg.InfiniteLine):
+    doubleClicked = Signal()
+
+    def mouseDoubleClickEvent(self, ev):
+        self.doubleClicked.emit()
+        ev.accept()

@@ -78,6 +78,12 @@
        </widget>
       </widget>
       <widget class="QScrollArea" name="control_scroll">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>1</verstretch>
+        </sizepolicy>
+       </property>
        <property name="minimumSize">
         <size>
          <width>360</width>
@@ -144,21 +150,21 @@
              <layout class="QHBoxLayout" name="horizontalLayout_playback">
               <item>
                <widget class="QPushButton" name="play_button">
-                <property name="text">
-                 <string>&#9654; Play</string>
-                </property>
                 <property name="enabled">
                  <bool>false</bool>
+                </property>
+                <property name="text">
+                 <string>▶ Play</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QPushButton" name="stop_button">
-                <property name="text">
-                 <string>&#9724; Stop</string>
-                </property>
                 <property name="enabled">
                  <bool>false</bool>
+                </property>
+                <property name="text">
+                 <string>◼ Stop</string>
                 </property>
                </widget>
               </item>
@@ -438,6 +444,12 @@
          </item>
          <item>
           <widget class="QGroupBox" name="filters_group">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
            <property name="title">
             <string>Filters</string>
            </property>
@@ -667,6 +679,12 @@
             </item>
             <item>
              <widget class="QTreeWidget" name="filter_tree">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
               <property name="alternatingRowColors">
                <bool>true</bool>
               </property>

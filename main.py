@@ -7,7 +7,7 @@ import librosa
 import numpy as np
 import pandas as pd
 import sounddevice as sd
-from PySide6.QtCore import Qt, QThread, QTimer
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog,
                                QInputDialog, QLabel, QMainWindow, QMessageBox,
@@ -16,7 +16,7 @@ import pyqtgraph as pg
 
 from src.config import ConfigManager
 from src.filters import Filters
-from src.helpers import ColumnPickerDialog, FileLoadWorker, FilterWorker
+from src.helpers import ColumnPickerDialog, FileLoadWorker, FilterWorker, PlaybackLine
 from ui.wavefilter_ui import Ui_MainWindow
 
 appid = 'WaveFilter'
@@ -35,6 +35,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.raw_line = None
         self.filter_line = None
         self.fft_line = None
+        self._start_line = None
+        self._stop_line = None
 
         self._config_manager = ConfigManager()
 
@@ -250,6 +252,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
 
         self._clear_plots()
+        self._init_playback_lines()
         self._refresh()
         self.play_button.setEnabled(True)
         self.stop_button.setEnabled(False)
@@ -306,6 +309,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             f"  |  {components_str}  +  noise"
         )
         self._clear_plots()
+        self._init_playback_lines()
         self._refresh()
         self.play_button.setEnabled(True)
         self.stop_button.setEnabled(False)
@@ -383,6 +387,56 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         return signal, sr
 
+    def _init_playback_lines(self):
+        if self.filter_obj is None:
+            return
+        t_max = float(self.filter_obj._time[-1]) if len(self.filter_obj._time) > 0 else 1.0
+        self._start_line = PlaybackLine(
+            pos=0.0, angle=90, movable=True,
+            pen=pg.mkPen(color=(0, 180, 80), width=2, style=Qt.DashLine),
+            hoverPen=pg.mkPen(color=(255, 255, 255), width=3),
+            label='▶ {value:.2f}s',
+        )
+        self._start_line.label.fill = pg.mkBrush(20, 20, 20)
+        self._start_line.label.color = pg.mkBrush(0, 180, 80)
+        self._start_line.label.orthoPos = 0.96
+        self._start_line.doubleClicked.connect(lambda: self._start_line.setValue(0.0))
+        self._start_line.sigPositionChanged.connect(self._clamp_playback_start)
+
+        self._stop_line = PlaybackLine(
+            pos=t_max, angle=90, movable=True,
+            pen=pg.mkPen(color=(200, 0, 0), width=2, style=Qt.DashLine),
+            hoverPen=pg.mkPen(color=(255, 255, 255), width=3),
+            label='■ {value:.2f}s',
+        )
+        self._stop_line.label.fill = pg.mkBrush(20, 20, 20)
+        self._stop_line.label.color = pg.mkBrush(200, 0, 0)
+        self._stop_line.label.orthoPos = 0.96
+        self._stop_line.doubleClicked.connect(
+            lambda: self._stop_line.setValue(float(self.filter_obj._time[-1]))
+        )
+        self._stop_line.sigPositionChanged.connect(self._clamp_playback_stop)
+
+        self.signal_plot.addItem(self._start_line)
+        self.signal_plot.addItem(self._stop_line)
+
+    def _clamp_playback_start(self):
+        if self._start_line is None or self._stop_line is None:
+            return
+        v = self._start_line.value()
+        clamped = max(0.0, min(v, self._stop_line.value() - 0.001))
+        if clamped != v:
+            self._start_line.setValue(clamped)
+
+    def _clamp_playback_stop(self):
+        if self._start_line is None or self._stop_line is None or self.filter_obj is None:
+            return
+        t_max = float(self.filter_obj._time[-1])
+        v = self._stop_line.value()
+        clamped = min(t_max, max(v, self._start_line.value() + 0.001))
+        if clamped != v:
+            self._stop_line.setValue(clamped)
+
     def _clear_plots(self):
         self.fft_plot.clear()
         self.signal_plot.clear()
@@ -391,6 +445,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.raw_line = None
         self.filter_line = None
         self.fft_line = None
+        self._start_line = None
+        self._stop_line = None
         self.preview_check.setChecked(False)
         for attr in ('low_f_line', 'high_f_line'):
             if hasattr(self, attr):
@@ -440,7 +496,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.fft_line is None:
             self.fft_line = self.fft_plot.plot(
                 freq, amp,
-                pen=pg.mkPen(color='m', width=2), name="FFT"
+                pen=pg.mkPen(color=(0, 200, 0), width=2), name="FFT"
             )
             self.fft_line.setDownsampling(auto=True, method='peak')
             self.fft_line.setClipToView(True)
@@ -696,6 +752,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if result is not None:
                 signal = result
         signal = np.asarray(signal, dtype=np.float32)
+        if self._start_line is not None and self._stop_line is not None:
+            t_start = min(self._start_line.value(), self._stop_line.value())
+            t_stop = max(self._start_line.value(), self._stop_line.value())
+            i_start = max(0, int(t_start * sample_rate))
+            i_stop = min(len(signal), int(t_stop * sample_rate))
+            if i_start < i_stop:
+                signal = signal[i_start:i_stop]
         max_val = np.max(np.abs(signal))
         if max_val > 0:
             signal = signal / max_val
@@ -746,11 +809,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.raw_line is None:
             self.raw_line = self.signal_plot.plot(
                 time, raw,
-                pen=pg.mkPen(color='b', width=2), name="Raw"
+                pen=pg.mkPen(color=(200, 200, 200), width=2), name="Raw"
             )
             self.filter_line = self.signal_plot.plot(
                 time, filtered,
-                pen=pg.mkPen(color='r', width=2), name="Filtered"
+                pen=pg.mkPen(color=(150, 0, 255), width=2), name="Filtered"
             )
             for line in (self.raw_line, self.filter_line):
                 line.setDownsampling(auto=True, method='peak')
