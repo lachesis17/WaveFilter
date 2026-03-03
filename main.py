@@ -65,7 +65,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.generate_button.clicked.connect(self._generate_test_signal)
         self.apply_fft_button.clicked.connect(self._apply_fft_handler)
         self.apply_filter_button.clicked.connect(self._apply_filter_committed)
-        self.clear_button.clicked.connect(lambda: self._clear_filters)
+        self.clear_button.clicked.connect(self._clear_filters)
 
         self.preview_check.toggled.connect(self._preview_toggled)
 

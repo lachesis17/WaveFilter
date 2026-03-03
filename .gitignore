@@ -3,6 +3,8 @@
 /src/__pycache__
 /settings
 /output
+/.venv
+pyvenv.cfg
 *.pyc
 *.pyo
 *.pyd
