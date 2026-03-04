@@ -154,7 +154,11 @@
                  <bool>false</bool>
                 </property>
                 <property name="text">
-                 <string>▶ Play</string>
+                 <string> Play</string>
+                </property>
+                <property name="icon">
+                 <iconset>
+                  <normaloff>ui/icons/play.ico</normaloff>ui/icons/play.ico</iconset>
                 </property>
                </widget>
               </item>
@@ -164,7 +168,11 @@
                  <bool>false</bool>
                 </property>
                 <property name="text">
-                 <string>◼ Stop</string>
+                 <string>  Stop</string>
+                </property>
+                <property name="icon">
+                 <iconset>
+                  <normaloff>ui/icons/stop.ico</normaloff>ui/icons/stop.ico</iconset>
                 </property>
                </widget>
               </item>
@@ -774,7 +782,7 @@
   <action name="actionLine_Colors">
    <property name="icon">
     <iconset>
-     <normaloff>ui/colors.ico</normaloff>ui/colors.ico</iconset>
+     <normaloff>ui/icons/colors.ico</normaloff>ui/icons/colors.ico</iconset>
    </property>
    <property name="text">
     <string> Line Colors</string>

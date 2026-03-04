@@ -1,5 +1,6 @@
 import ctypes
 import sys
+import time as _time
 import wave
 import platform
 from pathlib import Path
@@ -8,7 +9,7 @@ import librosa
 import numpy as np
 import pandas as pd
 import sounddevice as sd
-from PySide6.QtCore import Qt, QThread, QTimer, Signal
+from PySide6.QtCore import Qt, QThread, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog,
                                QInputDialog, QLabel, QMainWindow, QMessageBox,
@@ -42,22 +43,29 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self._config_manager = ConfigManager()
 
-        # held state across async loading
+        # thread state across async
         self._load_dialog = None
         self._pending_load_path = None
         self._load_thread = None
         self._load_worker = None
-
-        # held state across async filtering
         self._filter_thread = None
         self._filter_worker = None
 
-        if platform.system() == 'Windows':
-            self.setWindowIcon(QIcon('ui/icon.ico'))
-        elif platform.system() == 'Darwin':
-            self.setWindowIcon(QIcon('ui/icon.icns'))
-        else:
-            self.setWindowIcon(QIcon('ui/icon.png'))
+        self._playback_line = None
+        self._playback_start_wall = 0.0
+        self._playback_t_offset = 0.0
+        self._playback_t_stop = 0.0
+        self._paused_position = None
+        self._is_playing = False
+        self._updating_playback_pos = False
+
+        ext = '.ico' if platform.system() == 'Windows' else '.icns' if platform.system() == 'Darwin' else '.png'
+        self._icon_play = QIcon(f'ui/icons/play{ext}')
+        self._icon_pause = QIcon(f'ui/icons/pause{ext}')
+        self._icon_playing = QIcon(f'ui/icons/playing{ext}')
+        self._icon_stop = QIcon(f'ui/icons/stop{ext}')
+
+        self.setWindowIcon(QIcon(f'ui/icons/icon{ext}'))
 
         self._setup_plots()
         self._connect_signals()
@@ -67,17 +75,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.fft_plot.setLabel('left', 'Amp')
         self.fft_plot.setLabel('bottom', 'Freq (Hz)')
         self.fft_plot.showGrid(x=True, y=True, alpha=0.3)
-        self.fft_legend = self.fft_plot.addLegend()
+        self.fft_legend = self.fft_plot.addLegend(offset=(-10, 10))
 
         self.signal_plot.setLabel('left', 'Amp')
         self.signal_plot.setLabel('bottom', 'Time (s)')
         self.signal_plot.showGrid(x=True, y=True, alpha=0.3)
-        self.signal_legend = self.signal_plot.addLegend()
+        self.signal_legend = self.signal_plot.addLegend(offset=(-10, -10))
 
     def _connect_signals(self):
         self.open_button.clicked.connect(self._load_file)
         self.generate_button.clicked.connect(self._generate_test_signal)
-        self.play_button.clicked.connect(self._play_audio)
+        self.play_button.clicked.connect(self._toggle_playback)
         self.stop_button.clicked.connect(self._stop_audio)
         self.apply_fft_button.clicked.connect(self._apply_fft_handler)
         self.apply_filter_button.clicked.connect(self._apply_filter_committed)
@@ -426,8 +434,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
         self._stop_line.sigPositionChanged.connect(self._clamp_playback_stop)
 
+        self._playback_line = PlaybackLine(
+            pos=0.0, angle=90, movable=True,
+            pen=pg.mkPen(color=(255, 255, 255), width=1),
+            hoverPen=pg.mkPen(color=(255, 255, 0), width=2),
+            label='⏵ {value:.2f}s',
+        )
+        self._playback_line.label.fill = pg.mkBrush(20, 20, 20)
+        self._playback_line.label.color = pg.mkBrush(255, 255, 255)
+        self._playback_line.label.orthoPos = 0.96
+        self._playback_line.setVisible(False)
+        self._playback_line.doubleClicked.connect(lambda: self._playback_line.setValue(self._start_line.value()) if self._start_line else None)
+        self._playback_line.sigPositionChanged.connect(self._on_playback_line_dragged)
+
         self.signal_plot.addItem(self._start_line)
         self.signal_plot.addItem(self._stop_line)
+        self.signal_plot.addItem(self._playback_line)
 
     def _clamp_playback_start(self):
         if self._start_line is None or self._stop_line is None:
@@ -449,13 +471,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _clear_plots(self):
         self.fft_plot.clear()
         self.signal_plot.clear()
-        self.fft_legend = self.fft_plot.addLegend()
-        self.signal_legend = self.signal_plot.addLegend()
+        self.fft_legend = self.fft_plot.addLegend(offset=(-10, 10))
+        self.signal_legend = self.signal_plot.addLegend(offset=(-10, -10))
         self.raw_line = None
         self.filter_line = None
         self.fft_line = None
         self._start_line = None
         self._stop_line = None
+        self._playback_line = None
         self.preview_check.setChecked(False)
         for attr in ('low_f_line', 'high_f_line'):
             if hasattr(self, attr):
@@ -670,10 +693,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._replot()
         self._populate_legend()
 
+    def _keep_playback_position(self):
+        pos = self._playback_line.value() if self._playback_line and self._playback_line.isVisible() else None
+        self._stop_audio()
+        if pos and self._playback_line:
+            self._playback_line.setValue(pos)
+            self._playback_line.setVisible(True)
+            self._paused_position = pos
+
     def _apply_filter_committed(self):
         if self.filter_obj is None:
             return
-        self._stop_audio()
+        self._keep_playback_position()
         filter_type = self.filter_combo.currentText()
 
         if filter_type == "IFFT / Kalman Filter":
@@ -740,11 +771,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _clear_filters(self):
         if self.filter_obj is None:
             return
-        self._stop_audio()
+        self._keep_playback_position()
         self.filter_obj._applied_filters = []
         self.filter_obj._filtered = self.filter_obj._raw.copy()
         self.preview_check.setChecked(False)
         self._refresh()
+
+    def _toggle_playback(self):
+        if self._is_playing:
+            self._pause_audio()
+        else:
+            self._play_audio()
 
     def _play_audio(self):
         if self.filter_obj is None:
@@ -762,13 +799,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if result is not None:
                 signal = result
         signal = np.asarray(signal, dtype=np.float32)
-        if self._start_line is not None and self._stop_line is not None:
-            t_start = min(self._start_line.value(), self._stop_line.value())
-            t_stop = max(self._start_line.value(), self._stop_line.value())
-            i_start = max(0, int(t_start * sample_rate))
-            i_stop = min(len(signal), int(t_stop * sample_rate))
-            if i_start < i_stop:
-                signal = signal[i_start:i_stop]
+
+        t_region_start = 0.0
+        t_region_stop = len(signal) / sample_rate
+        if self._start_line and self._stop_line:
+            t_region_start = min(self._start_line.value(), self._stop_line.value())
+            t_region_stop = max(self._start_line.value(), self._stop_line.value())
+
+        resume_offset = 0.0
+        if self._paused_position is not None:
+            resume_offset = self._paused_position - t_region_start
+            self._paused_position = None
+
+        i_start = max(0, int(t_region_start * sample_rate))
+        i_stop = min(len(signal), int(t_region_stop * sample_rate))
+        if i_start >= i_stop:
+            return
+        signal = signal[i_start:i_stop]
+
         max_val = np.max(np.abs(signal))
         if max_val > 0:
             signal = signal / max_val
@@ -776,30 +824,108 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if sample_rate not in valid_rates:
             signal = librosa.resample(signal, orig_sr=sample_rate, target_sr=22050)
             sample_rate = 22050
-        sd.play(signal, sample_rate)
-        self.play_button.setEnabled(False)
+
+        if resume_offset > 0:
+            resume_samples = int(resume_offset * sample_rate)
+            signal = np.roll(signal, -resume_samples)
+
+        sd.play(signal, sample_rate, loop=True)
+
+        self._playback_start_wall = _time.monotonic() - resume_offset
+        self._playback_t_offset = t_region_start
+        self._playback_t_stop = t_region_stop
+        self._playback_duration = t_region_stop - t_region_start
+        self._is_playing = True
+
+        if self._playback_line:
+            self._updating_playback_pos = True
+            self._playback_line.setValue(t_region_start + resume_offset)
+            self._updating_playback_pos = False
+            self._playback_line.setVisible(True)
+
+        self.play_button.setIcon(self._icon_pause)
+        self.play_button.setText(" Pause")
         self.stop_button.setEnabled(True)
+
         self._playback_timer = QTimer(self)
         self._playback_timer.timeout.connect(self._check_playback)
-        self._playback_timer.start(100)
+        self._playback_timer.start(50)
+
+    def _pause_audio(self):
+        elapsed = _time.monotonic() - self._playback_start_wall
+        if self._playback_duration > 0:
+            looped = elapsed % self._playback_duration
+        else:
+            looped = 0.0
+        self._paused_position = self._playback_t_offset + looped
+        sd.stop()
+        if hasattr(self, '_playback_timer'):
+            self._playback_timer.stop()
+        self._is_playing = False
+        self.play_button.setIcon(self._icon_play)
+        self.play_button.setText("Play")
 
     def _check_playback(self):
         try:
-            if not sd.get_stream().active:
-                self._playback_timer.stop()
-                self.play_button.setEnabled(True)
-                self.stop_button.setEnabled(False)
-        except Exception:
+            active = sd.get_stream().active
+        except (AttributeError, RuntimeError):
+            active = False
+
+        if active:
+            elapsed = _time.monotonic() - self._playback_start_wall
+            if self._playback_duration > 0:
+                looped = elapsed % self._playback_duration
+            else:
+                looped = 0.0
+            current_t = self._playback_t_offset + looped
+            if self._playback_line:
+                self._updating_playback_pos = True
+                self._playback_line.setValue(current_t)
+                self._updating_playback_pos = False
+        else:
             self._playback_timer.stop()
-            self.play_button.setEnabled(True)
+            self._is_playing = False
+            self._paused_position = None
+            self.play_button.setIcon(self._icon_play)
+            self.play_button.setText("Play")
             self.stop_button.setEnabled(False)
+            if self._playback_line:
+                self._playback_line.setVisible(False)
 
     def _stop_audio(self):
         sd.stop()
         if hasattr(self, '_playback_timer'):
             self._playback_timer.stop()
+        self._is_playing = False
+        self._paused_position = None
+        self.play_button.setIcon(self._icon_play)
+        self.play_button.setText("Play")
         self.play_button.setEnabled(self.filter_obj is not None)
         self.stop_button.setEnabled(False)
+        if self._playback_line:
+            self._playback_line.setVisible(False)
+
+    def _on_playback_line_dragged(self):
+        if self._updating_playback_pos:
+            return
+        if not self._playback_line or not self._start_line or not self._stop_line:
+            return
+        t_lo = self._start_line.value()
+        t_hi = self._stop_line.value()
+        v = self._playback_line.value()
+        clamped = max(t_lo, min(v, t_hi))
+        if clamped != v:
+            self._playback_line.setValue(clamped)
+            return
+        if self._is_playing:
+            sd.stop()
+            if hasattr(self, '_playback_timer'):
+                self._playback_timer.stop()
+            self._is_playing = False
+            self._paused_position = clamped
+            self._play_audio()
+        elif self._paused_position:
+            self._paused_position = clamped
 
     def _populate_filter_list(self):
         self.filter_tree.clear()

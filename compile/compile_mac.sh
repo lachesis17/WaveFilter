@@ -7,8 +7,26 @@ HOOK=$(mktemp /tmp/hook_cwd.XXXXXX.py)
 echo 'import os,sys; os.chdir(sys._MEIPASS)' > "$HOOK"
 trap "rm -f '$HOOK'" EXIT
 
+# .ico → .icns
+for icon in ui/icons/play ui/icons/pause ui/icons/playing ui/icons/stop ui/icons/colors; do
+    png="${icon}.png"
+    icns="${icon}.icns"
+    if [ -f "$png" ] && [ ! -f "$icns" ]; then
+        iconset=$(mktemp -d)/icon.iconset
+        mkdir -p "$iconset"
+        for size in 16 32 128 256 512; do
+            sips -z $size $size "$png" --out "$iconset/icon_${size}x${size}.png" > /dev/null
+            double=$((size * 2))
+            sips -z $double $double "$png" --out "$iconset/icon_${size}x${size}@2x.png" > /dev/null
+        done
+        iconutil -c icns "$iconset" -o "$icns"
+        rm -rf "$(dirname "$iconset")"
+        echo "Created $icns"
+    fi
+done
+
 cp ui/wavefilter.ui ui/wavefilter.ui.bak
-sed -i '' 's/colors\.ico/colors.icns/g' ui/wavefilter.ui
+sed -i '' 's/\.ico/.icns/g' ui/wavefilter.ui
 pyside6-uic ui/wavefilter.ui > ui/wavefilter_ui.py
 cp ui/wavefilter.ui.bak ui/wavefilter.ui
 
@@ -16,7 +34,7 @@ pyinstaller \
     --noconfirm \
     --windowed \
     --clean \
-    --icon=ui/icon.icns \
+    --icon=ui/icons/icon.icns \
     --name=WaveFilter \
     --contents-directory=. \
     --distpath=output \

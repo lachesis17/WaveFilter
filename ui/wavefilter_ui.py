@@ -34,7 +34,7 @@ class Ui_MainWindow(object):
         self.actionLine_Colors = QAction(MainWindow)
         self.actionLine_Colors.setObjectName(u"actionLine_Colors")
         icon = QIcon()
-        icon.addFile(u"ui/colors.ico", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        icon.addFile(u"ui/icons/colors.ico", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
         self.actionLine_Colors.setIcon(icon)
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
@@ -120,12 +120,18 @@ class Ui_MainWindow(object):
         self.play_button = QPushButton(self.file_group)
         self.play_button.setObjectName(u"play_button")
         self.play_button.setEnabled(False)
+        icon1 = QIcon()
+        icon1.addFile(u"ui/icons/play.ico", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.play_button.setIcon(icon1)
 
         self.horizontalLayout_playback.addWidget(self.play_button)
 
         self.stop_button = QPushButton(self.file_group)
         self.stop_button.setObjectName(u"stop_button")
         self.stop_button.setEnabled(False)
+        icon2 = QIcon()
+        icon2.addFile(u"ui/icons/stop.ico", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.stop_button.setIcon(icon2)
 
         self.horizontalLayout_playback.addWidget(self.stop_button)
 
@@ -478,8 +484,8 @@ class Ui_MainWindow(object):
         self.open_button.setText(QCoreApplication.translate("MainWindow", u"Open File", None))
         self.generate_button.setText(QCoreApplication.translate("MainWindow", u"Generate Test Signal", None))
         self.file_label.setText(QCoreApplication.translate("MainWindow", u"No file loaded", None))
-        self.play_button.setText(QCoreApplication.translate("MainWindow", u"\u25b6 Play", None))
-        self.stop_button.setText(QCoreApplication.translate("MainWindow", u"\u25fc Stop", None))
+        self.play_button.setText(QCoreApplication.translate("MainWindow", u" Play", None))
+        self.stop_button.setText(QCoreApplication.translate("MainWindow", u"  Stop", None))
         self.fft_group.setTitle(QCoreApplication.translate("MainWindow", u"FFT", None))
         self.normalize_check.setText(QCoreApplication.translate("MainWindow", u"Normalize", None))
         self.window_check_fft.setText(QCoreApplication.translate("MainWindow", u"Hanning Window", None))
