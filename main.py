@@ -769,13 +769,27 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         QMessageBox.critical(self, "Filter error", msg)
 
     def _clear_filters(self):
-        if self.filter_obj is None:
+        if not self.filter_obj or not self.filter_obj._applied_filters:
             return
         self._keep_playback_position()
-        self.filter_obj._applied_filters = []
+
+        selected = self.filter_tree.selectedItems()
+        if selected:
+            indices = sorted({self.filter_tree.indexOfTopLevelItem(item) for item in selected}, reverse=True)
+            for idx in indices:
+                if 0 <= idx < len(self.filter_obj._applied_filters):
+                    self.filter_obj._applied_filters.pop(idx)
+        else:
+            self.filter_obj._applied_filters.pop()
+
         self.filter_obj._filtered = self.filter_obj._raw.copy()
+        for f_type, f_args in self.filter_obj._applied_filters:
+            self._apply_filter(filter_type=f_type, apply=False, stack=True, _args=f_args)
+
         self.preview_check.setChecked(False)
-        self._refresh()
+        self._populate_filter_list()
+        self._replot()
+        self._populate_legend()
 
     def _toggle_playback(self):
         if self._is_playing:

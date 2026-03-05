@@ -16,12 +16,12 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
     QIcon, QImage, QKeySequence, QLinearGradient,
     QPainter, QPalette, QPixmap, QRadialGradient,
     QTransform)
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox,
-    QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
-    QLabel, QMainWindow, QMenu, QMenuBar,
-    QPushButton, QScrollArea, QSizePolicy, QSpinBox,
-    QSplitter, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
-    QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComboBox,
+    QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
+    QHeaderView, QLabel, QMainWindow, QMenu,
+    QMenuBar, QPushButton, QScrollArea, QSizePolicy,
+    QSpinBox, QSplitter, QTreeWidget, QTreeWidgetItem,
+    QVBoxLayout, QWidget)
 
 from pyqtgraph import PlotWidget
 
@@ -421,6 +421,7 @@ class Ui_MainWindow(object):
         sizePolicy4.setHeightForWidth(self.filter_tree.sizePolicy().hasHeightForWidth())
         self.filter_tree.setSizePolicy(sizePolicy4)
         self.filter_tree.setAlternatingRowColors(True)
+        self.filter_tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.filter_tree.setIndentation(0)
         self.filter_tree.header().setMinimumSectionSize(40)
 
