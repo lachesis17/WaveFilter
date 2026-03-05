@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog,
                                QInputDialog, QLabel, QMainWindow, QMessageBox,
                                QProgressBar, QTreeWidgetItem, QVBoxLayout)
 import pyqtgraph as pg
+pg.setConfigOptions(useOpenGL=True, enableExperimental=True)
 
 from src.config import ConfigManager
 from src.filters import Filters
@@ -74,12 +75,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _setup_plots(self):
         self.fft_plot.setLabel('left', 'Amp')
         self.fft_plot.setLabel('bottom', 'Freq (Hz)')
-        self.fft_plot.showGrid(x=True, y=True, alpha=0.3)
+        self.fft_plot.showGrid(x=True, alpha=0.3)
         self.fft_legend = self.fft_plot.addLegend(offset=(-10, 10))
 
         self.signal_plot.setLabel('left', 'Amp')
         self.signal_plot.setLabel('bottom', 'Time (s)')
-        self.signal_plot.showGrid(x=True, y=True, alpha=0.3)
+        self.signal_plot.showGrid(x=True, alpha=0.3)
         self.signal_legend = self.signal_plot.addLegend(offset=(-10, -10))
 
     def _connect_signals(self):
@@ -531,7 +532,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 freq, amp,
                 pen=pg.mkPen(color=colors['fft'], width=2), name="FFT"
             )
-            self.fft_line.setDownsampling(auto=True, method='peak')
             self.fft_line.setClipToView(True)
         else:
             self.fft_line.setData(x=freq, y=amp)
@@ -983,7 +983,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 pen=pg.mkPen(color=colors['filtered'], width=2), name="Filtered"
             )
             for line in (self.raw_line, self.filter_line):
-                line.setDownsampling(auto=True, method='peak')
                 line.setClipToView(True)
             self.signal_plot.setYRange(-1.4, 1.4)
         else:

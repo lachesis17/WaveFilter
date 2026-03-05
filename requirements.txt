@@ -1,5 +1,7 @@
 PySide6>=6.8.0.2
 pyqtgraph>=0.13
+PyOpenGL
+PyOpenGL_accelerate
 numpy
 scipy
 pandas
