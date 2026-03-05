@@ -8,7 +8,7 @@ echo 'import os,sys; os.chdir(sys._MEIPASS)' > "$HOOK"
 trap "rm -f '$HOOK'" EXIT
 
 # .ico → .icns
-for icon in ui/icons/play ui/icons/pause ui/icons/playing ui/icons/stop ui/icons/colors; do
+for icon in ui/icons/icon ui/icons/play ui/icons/pause ui/icons/playing ui/icons/stop ui/icons/colors; do
     png="${icon}.png"
     icns="${icon}.icns"
     if [ -f "$png" ] && [ ! -f "$icns" ]; then
