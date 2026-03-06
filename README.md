@@ -1,10 +1,11 @@
-# <img src="https://github.com/user-attachments/assets/d65cd88b-a1d4-43c9-b8f4-cbc5e2ac436b" height="28"> WaveFilter
+# <img src="https://github.com/user-attachments/assets/00df788b-5ce5-4b66-8863-53c74a2e9ec7" height="30"> WaveFilter
 
 A desktop signal processing application with PySide6. Load audio or data files, visualise the raw and filtered waveforms alongside their FFT spectra and apply one or more filters in sequence with real-time previews and playback.
 
 ![wavefilter](https://github.com/user-attachments/assets/fae6cdc3-1597-46fa-bb25-5a7f445315c1)
 
 ---
+
 
 ## Features
 
