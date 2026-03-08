@@ -1,6 +1,8 @@
-import numpy as np
+import json
 import math
 
+import h5py
+import numpy as np
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QColorDialog, QComboBox, QDialog,
@@ -189,6 +191,61 @@ class FileLoadWorker(QObject):
             self.finished.emit((signal, sample_rate, display_signal, display_rate))
         except Exception as e:
             print(e)
+            self.error.emit(str(e))
+
+
+class SessionSaveWorker(QObject):
+    finished = Signal()
+    error = Signal(str)
+
+    def __init__(self, path, raw_full, rate_full, applied_filters, start_pos, stop_pos):
+        super().__init__()
+        self._path = path
+        self._raw_full = raw_full
+        self._rate_full = rate_full
+        self._applied_filters = applied_filters
+        self._start_pos = start_pos
+        self._stop_pos = stop_pos
+
+    def run(self):
+        try:
+            # normalize to int16 for compact storage
+            signal = self._raw_full
+            peak = np.max(np.abs(signal)) or 1.0
+            int16_data = (signal / peak * 32767).astype(np.int16)
+            with h5py.File(self._path, 'w') as f:
+                f.create_dataset('raw_full', data=int16_data, compression='gzip', compression_opts=9)
+                f.attrs['peak'] = peak
+                f.attrs['rate_full'] = self._rate_full
+                f.attrs['applied_filters'] = json.dumps(self._applied_filters)
+                f.attrs['start_pos'] = self._start_pos
+                f.attrs['stop_pos'] = self._stop_pos
+            self.finished.emit()
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class SessionLoadWorker(QObject):
+    finished = Signal(object)
+    error = Signal(str)
+
+    def __init__(self, path):
+        super().__init__()
+        self._path = path
+
+    def run(self):
+        try:
+            with h5py.File(self._path, 'r') as f:
+                # restore from int16 using saved peak amplitude
+                peak = float(f.attrs.get('peak', 1.0))
+                raw_full = f['raw_full'][:].astype(np.float64) / 32767.0 * peak
+                rate_full = int(f.attrs['rate_full'])
+                applied_filters = json.loads(f.attrs['applied_filters'])
+                start_pos = float(f.attrs.get('start_pos', 0.0))
+                stop_pos = float(f.attrs.get('stop_pos', len(raw_full) / rate_full))
+            display_signal, display_rate = decimate_signal(raw_full, rate_full)
+            self.finished.emit((display_signal, display_rate, raw_full, rate_full, applied_filters, start_pos, stop_pos))
+        except Exception as e:
             self.error.emit(str(e))
 
 

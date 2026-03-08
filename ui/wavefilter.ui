@@ -774,14 +774,40 @@
      <height>22</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+    <addaction name="actionSave_Session"/>
+    <addaction name="actionLoad_Session"/>
+   </widget>
    <widget class="QMenu" name="menuSettings">
     <property name="title">
      <string>Settings</string>
     </property>
     <addaction name="actionLine_Colors"/>
    </widget>
+   <addaction name="menuFile"/>
    <addaction name="menuSettings"/>
   </widget>
+  <action name="actionSave_Session">
+   <property name="icon">
+    <iconset>
+     <normaloff>ui/icons/save.ico</normaloff>ui/icons/save.ico</iconset>
+   </property>
+   <property name="text">
+    <string> Save Session</string>
+   </property>
+  </action>
+  <action name="actionLoad_Session">
+   <property name="icon">
+    <iconset>
+     <normaloff>ui/icons/load.ico</normaloff>ui/icons/load.ico</iconset>
+   </property>
+   <property name="text">
+    <string> Load Session</string>
+   </property>
+  </action>
   <action name="actionLine_Colors">
    <property name="icon">
     <iconset>

@@ -1,8 +1,8 @@
 import ctypes
+import platform
 import sys
 import time as _time
 import wave
-import platform
 from pathlib import Path
 
 import librosa
@@ -19,7 +19,9 @@ pg.setConfigOptions(useOpenGL=True, enableExperimental=True)
 
 from src.config import ConfigManager
 from src.filters import Filters
-from src.helpers import PlaybackLine, FileLoadWorker, FilterWorker, ColumnPickerDialog, LineColorsDialog
+from src.helpers import (ColumnPickerDialog, FileLoadWorker, FilterWorker,
+                         LineColorsDialog, PlaybackLine,
+                         SessionSaveWorker, SessionLoadWorker)
 from ui.wavefilter_ui import Ui_MainWindow
 
 appid = 'WaveFilter'
@@ -118,6 +120,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.fft_mode_combo.currentIndexChanged.connect(self._on_filter_param_changed)
 
         self.actionLine_Colors.triggered.connect(self._open_line_colors_dialog)
+        self.actionSave_Session.triggered.connect(self._save_session)
+        self.actionLoad_Session.triggered.connect(self._load_session)
 
     def _preview_toggled(self, checked):
         if not checked:
@@ -213,19 +217,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             QMessageBox.warning(self, "Unsupported format", f"Cannot load '{suffix}' files.")
             return
 
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Loading")
-        dialog.setModal(True)
-        dialog.setFixedWidth(400)
-        layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel("Loading file, please wait..."))
-        bar = QProgressBar()
-        bar.setRange(0, 0)
-        layout.addWidget(bar)
-        dialog.show()
-
         self._pending_load_path = path
-        self._load_dialog = dialog
+        self._load_dialog = self._show_progress("Loading", "Loading file, please wait...")
 
         thread = QThread()
         worker = FileLoadWorker(loader, path)
@@ -275,6 +268,118 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.play_button.setEnabled(True)
         self.stop_button.setEnabled(False)
 
+    def _show_progress(self, title, message):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setModal(True)
+        dialog.setFixedWidth(400)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel(message))
+        bar = QProgressBar()
+        bar.setRange(0, 0)
+        layout.addWidget(bar)
+        dialog.show()
+        return dialog
+
+    def _save_session(self):
+        if not self.filter_obj:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Session", self._config_manager.get_last_directory(),
+            "WaveFilter Session (*.wavefilter)",
+        )
+        if not path:
+            return
+        self._config_manager.update_last_directory(path)
+        fo = self.filter_obj
+
+        self._save_dialog = self._show_progress("Saving", "Saving session, please wait...")
+
+        thread = QThread()
+        worker = SessionSaveWorker(
+            path, fo._raw_full, fo._rate_full, fo._applied_filters,
+            self._start_line.value() if self._start_line else 0.0,
+            self._stop_line.value() if self._stop_line else float(fo._time[-1]),
+        )
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._on_session_saved, Qt.ConnectionType.QueuedConnection)
+        worker.error.connect(self._on_session_save_error, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._save_thread = thread
+        self._save_worker = worker
+        thread.start()
+
+    def _on_session_saved(self):
+        self._save_dialog.close()
+        self._save_thread.quit()
+
+    def _on_session_save_error(self, msg):
+        self._save_dialog.close()
+        QMessageBox.critical(self, "Save error", msg)
+        self._save_thread.quit()
+
+    def _load_session(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load Session", self._config_manager.get_last_directory(),
+            "WaveFilter Session (*.wavefilter)",
+        )
+        if not path:
+            return
+        self._config_manager.update_last_directory(path)
+        self._stop_audio()
+        self._pending_session_path = path
+        self._load_session_dialog = self._show_progress("Loading", "Loading session, please wait...")
+
+        thread = QThread()
+        worker = SessionLoadWorker(path)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._on_session_loaded, Qt.ConnectionType.QueuedConnection)
+        worker.error.connect(self._on_session_load_error, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._load_session_thread = thread
+        self._load_session_worker = worker
+        thread.start()
+
+    def _on_session_loaded(self, payload):
+        display_signal, display_rate, raw_full, rate_full, applied_filters, start_pos, stop_pos = payload
+        self._load_session_dialog.close()
+        self._load_session_thread.quit()
+
+        fo = Filters()
+        fo._raw = display_signal.astype(float)
+        fo._filtered = fo._raw.copy()
+        fo._time = np.arange(len(fo._raw)) / display_rate
+        fo._applied_filters = [tuple(f) for f in applied_filters]
+        fo._raw_full = raw_full
+        fo._rate_full = rate_full
+        self.filter_obj = fo
+
+        n = len(raw_full)
+        duration = n / rate_full
+        self.file_label.setText(Path(self._pending_session_path).name)
+        self.info_label.setText(
+            f"Sample Rate: {rate_full} Hz  |  Samples: {n}  |  Duration: {duration:.3f} s"
+        )
+
+        self._clear_plots()
+        self._init_playback_lines()
+        if self._start_line:
+            self._start_line.setValue(start_pos)
+        if self._stop_line:
+            self._stop_line.setValue(stop_pos)
+        self._refresh()
+        self.play_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+
+    def _on_session_load_error(self, msg):
+        self._load_session_dialog.close()
+        QMessageBox.critical(self, "Load error", msg)
+        self._load_session_thread.quit()
+
     def _generate_test_signal(self):
         """
         Generate a randomised synthetic signal.
@@ -282,7 +387,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         (sine, square, sawtooth, triangle), frequencies, amplitudes,
         adds gaussian noise, normalised to -1, 1.
         """
-        from scipy.signal import square, sawtooth
+        from scipy.signal import sawtooth, square
 
         sample_rate = 8_000
         duration = 3.0
