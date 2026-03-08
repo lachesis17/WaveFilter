@@ -249,6 +249,51 @@ class SessionLoadWorker(QObject):
             self.error.emit(str(e))
 
 
+class ExportWorker(QObject):
+    finished = Signal()
+    error = Signal(str)
+
+    def __init__(self, path, signal, sample_rate, applied_filters):
+        super().__init__()
+        self._path = path
+        self._signal = signal
+        self._sample_rate = sample_rate
+        self._applied_filters = applied_filters
+
+    def run(self):
+        try:
+            from pathlib import Path
+            from src.filters import Filters
+
+            # apply filters to full-rate signal
+            signal = self._signal.copy()
+            for f_type, f_args in self._applied_filters:
+                low_freq, high_freq, order = f_args[0], f_args[1], int(f_args[2])
+                filter_design = f_args[4] if len(f_args) > 4 else 'butter'
+                ripple = f_args[5] if len(f_args) > 5 else 3.0
+                attenuation = f_args[6] if len(f_args) > 6 else 60.0
+                result = Filters.apply_standard_filter(
+                    signal, self._sample_rate, f_type, low_freq, high_freq, order,
+                    filter_design, ripple, attenuation)
+                if result is not None:
+                    signal = result
+
+            ext = Path(self._path).suffix.lower()
+            if ext in ('.wav', '.mp3'):
+                import soundfile as sf
+                peak = np.max(np.abs(signal)) or 1.0
+                normalized = (signal / peak).astype(np.float32)
+                sf.write(self._path, normalized, self._sample_rate)
+            elif ext == '.xlsx':
+                import pandas as pd
+                time = np.arange(len(signal)) / self._sample_rate
+                df = pd.DataFrame({'Time (s)': time, 'Amplitude': signal})
+                df.to_excel(self._path, index=False)
+            self.finished.emit()
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class PlaybackLine(pg.InfiniteLine):
     doubleClicked = Signal()
 

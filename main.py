@@ -19,9 +19,9 @@ pg.setConfigOptions(useOpenGL=True, enableExperimental=True)
 
 from src.config import ConfigManager
 from src.filters import Filters
-from src.helpers import (ColumnPickerDialog, FileLoadWorker, FilterWorker,
-                         LineColorsDialog, PlaybackLine,
-                         SessionSaveWorker, SessionLoadWorker)
+from src.helpers import (ColumnPickerDialog, ExportWorker, FileLoadWorker,
+                         FilterWorker, SessionSaveWorker, SessionLoadWorker,
+                         LineColorsDialog, PlaybackLine)
 from ui.wavefilter_ui import Ui_MainWindow
 
 appid = 'WaveFilter'
@@ -122,6 +122,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionSave_Session.triggered.connect(self._save_session)
         self.actionLoad_Session.triggered.connect(self._load_session)
         self.actionTrim.triggered.connect(self._trim_signal)
+        self.actionExport.triggered.connect(self._export_signal)
 
     def _preview_toggled(self, checked):
         if not checked:
@@ -416,6 +417,43 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._refresh()
         self.play_button.setEnabled(True)
         self.stop_button.setEnabled(False)
+
+    def _export_signal(self):
+        fo = self.filter_obj
+        if not fo:
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Signal", self._config_manager.get_last_directory(),
+            "WAV (*.wav);;MP3 (*.mp3);;Excel (*.xlsx)",
+        )
+        if not path:
+            return
+        self._config_manager.update_last_directory(path)
+        self._export_path = path
+
+        self._export_dialog = self._show_progress("Exporting", "Exporting signal, please wait...")
+        thread = QThread()
+        worker = ExportWorker(path, fo._raw_full, fo._rate_full, fo._applied_filters)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._on_export_finished, Qt.ConnectionType.QueuedConnection)
+        worker.error.connect(self._on_export_error, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._export_thread = thread
+        self._export_worker = worker
+        thread.start()
+
+    def _on_export_finished(self):
+        self._export_dialog.close()
+        self._export_thread.quit()
+        self.info_label.setText(f"Exported to {Path(self._export_path).name}")
+
+    def _on_export_error(self, msg):
+        self._export_dialog.close()
+        self._export_thread.quit()
+        QMessageBox.critical(self, "Export error", msg)
 
     def _generate_test_signal(self):
         """

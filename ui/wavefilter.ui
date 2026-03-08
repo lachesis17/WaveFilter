@@ -782,6 +782,8 @@
     <addaction name="actionLoad_Session"/>
     <addaction name="separator"/>
     <addaction name="actionTrim"/>
+    <addaction name="separator"/>
+    <addaction name="actionExport"/>
    </widget>
    <widget class="QMenu" name="menuSettings">
     <property name="title">
@@ -817,6 +819,15 @@
    </property>
    <property name="text">
     <string> Trim to Selection</string>
+   </property>
+  </action>
+  <action name="actionExport">
+   <property name="icon">
+    <iconset>
+     <normaloff>ui/icons/export.ico</normaloff>ui/icons/export.ico</iconset>
+   </property>
+   <property name="text">
+    <string> Export</string>
    </property>
   </action>
   <action name="actionLine_Colors">

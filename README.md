@@ -6,16 +6,17 @@ A desktop signal processing application with PySide6. Load audio or data files, 
 
 ---
 
-
 ## Features
 
 - Load WAV, MP3, CSV, and Excel files
-- Generate synthetic test signals (sine, square, sawtooth, triangle + noise)
-- Interactive time-domain and FFT plots
 - Real-time filter preview before applying
-- Stack and clear multiple filters
-- Optional hanning window
 - Playback audio with start/stop times and filters applied
+- Stack and clear multiple filters
+- Save and load sessions
+- Export filtered audio to `mp3`, `wav` and `excel`
+- Interactive time-domain and FFT plots
+- Generate synthetic test signals (sine, square, sawtooth, triangle + noise)
+- Optional hanning window
 - Custom colors for plotted lines
 
 ---
@@ -82,6 +83,7 @@ Both OS versions will compile to `/output` dir.
 Uses [auto-py-to-exe](https://github.com/brentvollebregt/auto-py-to-exe) with the config in `compile/`.
 
 The batch file changes dir to the project root before launching auto-py-to-exe, using the `wavefilter-autopytoexe.json` as a saved config with relative paths.
+
 ```
 ./compile/compile.bat
 ```
@@ -95,6 +97,7 @@ auto-py-to-exe --config compile/wavefilter-autopytoexe.json
 ### macOS
 
 The shell script replaces icon files for macOS, recompiles the ui as well as an inline temp python hook to handle relative paths when compiled on mac through pyinstaller.
+
 ```
 ./compile/compile_mac.sh
 ```
@@ -109,4 +112,4 @@ Just download the `*.7z` zip from [releases](https://github.com/lachesis17/WaveF
 
 https://github.com/user-attachments/assets/886a6ad0-9bb2-4962-a376-e0cd3b3d0077
 
-*Playback support demo with filters applied: low-pass, high-pass, band-pass, band-stop*
+_Playback support demo with filters applied: low-pass, high-pass, band-pass, band-stop_
