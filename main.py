@@ -143,6 +143,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.label_filter_high.setText("High Frequency")
         self.label_filter_order.setText("Order")
         self.filter_low_spin.setSuffix(" Hz")
+        self.filter_low_spin.setMinimum(10)
+        self.filter_low_spin.setMaximum(10000)
+        self.filter_low_spin.setSingleStep(10)
+        self.filter_low_spin.setDecimals(0)
+        self.filter_order_spin.setEnabled(True)
 
         if filter_type == "Savitzky-Golay Filter":
             self.filter_low_spin.setEnabled(True)
@@ -150,6 +155,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.label_filter_low.setText("Window Length")
             self.label_filter_order.setText("Poly Order")
             self.filter_low_spin.setSuffix("")
+            self._set_design_visible(False)
+        elif filter_type == "Pitch Shift":
+            self.filter_low_spin.setEnabled(True)
+            self.filter_high_spin.setEnabled(False)
+            self.filter_order_spin.setEnabled(False)
+            self.label_filter_low.setText("Semitones")
+            self.filter_low_spin.setSuffix(" st")
+            self.filter_low_spin.setMinimum(-36)
+            self.filter_low_spin.setMaximum(36)
+            self.filter_low_spin.setSingleStep(1)
+            self.filter_low_spin.setDecimals(1)
+            self.filter_low_spin.setValue(12)
             self._set_design_visible(False)
         elif filter_type == "IFFT / Kalman Filter":
             self.filter_low_spin.setEnabled(False)
@@ -781,6 +798,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         t = self.filter_obj._time
         return 1.0 / (t[1] - t[0]) if len(t) > 1 else 1.0
 
+    @staticmethod
+    def _apply_filters_full_rate(signal, sample_rate, applied_filters):
+        """
+        Apply filter stack to a full sample rate signal.
+        """
+        for f_type, f_args in applied_filters:
+            if f_type == "Pitch Shift":
+                signal = librosa.effects.pitch_shift(signal, sr=sample_rate, n_steps=f_args[0])
+            else:
+                low_freq, high_freq, order = f_args[0], f_args[1], int(f_args[2])
+                filter_design = f_args[4] if len(f_args) > 4 else 'butter'
+                ripple = f_args[5] if len(f_args) > 5 else 3.0
+                attenuation = f_args[6] if len(f_args) > 6 else 60.0
+                result = Filters.apply_standard_filter(
+                    signal, sample_rate, f_type, low_freq, high_freq, order,
+                    filter_design, ripple, attenuation)
+                if result is not None:
+                    signal = result
+        return signal
+
     def _get_filter_params(self):
         return (
             self.window_check_filter.isChecked(),
@@ -810,6 +847,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             _signal = self.filter_obj._raw
 
         signal_series = pd.Series(_signal)
+
+        if filter_type == "Pitch Shift":
+            n_steps = _args[0] if _args else self.filter_low_spin.value()
+            result = librosa.effects.pitch_shift(
+                np.asarray(_signal, dtype=float), sr=sample_rate, n_steps=n_steps)
+            self.filter_obj._filtered = result
+            if apply:
+                self.filter_obj._applied_filters.append((filter_type, [n_steps]))
+            return
 
         if filter_type == "IFFT / Kalman Filter":
             ifft_args = _args if _args is not None else [
@@ -887,7 +933,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._keep_playback_position()
         filter_type = self.filter_combo.currentText()
 
-        if filter_type == "IFFT / Kalman Filter":
+        if filter_type in ("IFFT / Kalman Filter", "Pitch Shift"):
             self._apply_filter(filter_type=filter_type, apply=True, stack=False)
             self.preview_check.setChecked(False)
             self._refresh()
@@ -982,16 +1028,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
         signal = np.asarray(self.filter_obj._raw_full, dtype=float)
         sample_rate = self.filter_obj._rate_full
-        for f_type, f_args in self.filter_obj._applied_filters:
-            low_freq, high_freq, order = f_args[0], f_args[1], int(f_args[2])
-            filter_design = f_args[4] if len(f_args) > 4 else 'butter'
-            ripple = f_args[5] if len(f_args) > 5 else 3.0
-            attenuation = f_args[6] if len(f_args) > 6 else 60.0
-            result = Filters.apply_standard_filter(
-                signal, sample_rate, f_type, low_freq, high_freq, order,
-                filter_design, ripple, attenuation)
-            if result is not None:
-                signal = result
+        signal = self._apply_filters_full_rate(signal, sample_rate, self.filter_obj._applied_filters)
         signal = np.asarray(signal, dtype=np.float32)
 
         t_region_start = 0.0
@@ -1126,7 +1163,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.filter_obj is None:
             return
         for f_type, f_args in self.filter_obj._applied_filters:
-            item = QTreeWidgetItem([str(f_type), str(f_args)])
+            if f_type == "Pitch Shift":
+                params = f"{f_args[0]:+g} semitones"
+            else:
+                params = str(f_args)
+            item = QTreeWidgetItem([str(f_type), params])
             self.filter_tree.addTopLevelItem(item)
 
     def _open_line_colors_dialog(self):

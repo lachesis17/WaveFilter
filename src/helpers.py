@@ -1,7 +1,9 @@
 import json
 import math
+from pathlib import Path
 
 import h5py
+import librosa
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QColor
@@ -9,6 +11,9 @@ from PySide6.QtWidgets import (QColorDialog, QComboBox, QDialog,
                                QDialogButtonBox, QFormLayout, QLabel,
                                QPushButton, QVBoxLayout)
 import pyqtgraph as pg
+from scipy.signal import decimate
+
+from src.filters import Filters
 
 # max num samples for pyqtgraph, signal above this is decimated with
 # an anti-aliasing filter on the worker thread before loading into UI
@@ -24,8 +29,6 @@ def decimate_signal(signal, sample_rate) -> tuple[np.ndarray, int]:
     n = len(signal)
     if n <= MAX_SAMPLES:
         return signal, sample_rate
-
-    from scipy.signal import decimate
 
     remaining = math.ceil(n / MAX_SAMPLES)
     while remaining > 1:
@@ -157,7 +160,6 @@ class FilterWorker(QObject):
 
     def run(self):
         try:
-            from src.filters import Filters
             result = Filters.apply_standard_filter(
                 self._signal, self._sample_rate, self._filter_type,
                 self._low_freq, self._high_freq, int(self._order),
@@ -262,21 +264,21 @@ class ExportWorker(QObject):
 
     def run(self):
         try:
-            from pathlib import Path
-            from src.filters import Filters
-
-            # apply filters to full-rate signal
+            # apply filters to full sample rate signal
             signal = self._signal.copy()
             for f_type, f_args in self._applied_filters:
-                low_freq, high_freq, order = f_args[0], f_args[1], int(f_args[2])
-                filter_design = f_args[4] if len(f_args) > 4 else 'butter'
-                ripple = f_args[5] if len(f_args) > 5 else 3.0
-                attenuation = f_args[6] if len(f_args) > 6 else 60.0
-                result = Filters.apply_standard_filter(
-                    signal, self._sample_rate, f_type, low_freq, high_freq, order,
-                    filter_design, ripple, attenuation)
-                if result is not None:
-                    signal = result
+                if f_type == "Pitch Shift":
+                    signal = librosa.effects.pitch_shift(signal, sr=self._sample_rate, n_steps=f_args[0])
+                else:
+                    low_freq, high_freq, order = f_args[0], f_args[1], int(f_args[2])
+                    filter_design = f_args[4] if len(f_args) > 4 else 'butter'
+                    ripple = f_args[5] if len(f_args) > 5 else 3.0
+                    attenuation = f_args[6] if len(f_args) > 6 else 60.0
+                    result = Filters.apply_standard_filter(
+                        signal, self._sample_rate, f_type, low_freq, high_freq, order,
+                        filter_design, ripple, attenuation)
+                    if result is not None:
+                        signal = result
 
             ext = Path(self._path).suffix.lower()
             if ext in ('.wav', '.mp3'):

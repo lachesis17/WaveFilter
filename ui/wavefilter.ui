@@ -508,6 +508,11 @@
                 </item>
                 <item>
                  <property name="text">
+                  <string>Pitch Shift</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
                   <string>IFFT / Kalman Filter</string>
                  </property>
                 </item>

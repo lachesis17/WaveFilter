@@ -338,6 +338,7 @@ class Ui_MainWindow(object):
         self.filter_combo.addItem("")
         self.filter_combo.addItem("")
         self.filter_combo.addItem("")
+        self.filter_combo.addItem("")
         self.filter_combo.setObjectName(u"filter_combo")
 
         self.horizontalLayout_filter_top.addWidget(self.filter_combo)
@@ -557,7 +558,8 @@ class Ui_MainWindow(object):
         self.filter_combo.setItemText(3, QCoreApplication.translate("MainWindow", u"Band Stop Filter", None))
         self.filter_combo.setItemText(4, QCoreApplication.translate("MainWindow", u"Notch Filter", None))
         self.filter_combo.setItemText(5, QCoreApplication.translate("MainWindow", u"Savitzky-Golay Filter", None))
-        self.filter_combo.setItemText(6, QCoreApplication.translate("MainWindow", u"IFFT / Kalman Filter", None))
+        self.filter_combo.setItemText(6, QCoreApplication.translate("MainWindow", u"Pitch Shift", None))
+        self.filter_combo.setItemText(7, QCoreApplication.translate("MainWindow", u"IFFT / Kalman Filter", None))
 
         self.label_filter_low.setText(QCoreApplication.translate("MainWindow", u"Low Frequency", None))
         self.filter_low_spin.setSuffix(QCoreApplication.translate("MainWindow", u" Hz", None))
