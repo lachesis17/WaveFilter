@@ -35,32 +35,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
 
         self.filter_obj: Filters | None = None
-        self._raw_filter_visible = True
-        self._filtered_filter_visible = True
+        self._raw_filter_visible: bool = True
+        self._filtered_filter_visible: bool = True
 
-        self.raw_line = None
-        self.filter_line = None
-        self.fft_line = None
-        self._start_line = None
-        self._stop_line = None
+        self.fft_plot: pg.PlotWidget
+        self.signal_plot: pg.PlotWidget
+        self.fft_legend: pg.LegendItem
+        self.signal_legend: pg.LegendItem
+
+        self.raw_line: pg.PlotDataItem | None = None
+        self.filter_line: pg.PlotDataItem | None = None
+        self.fft_line: pg.PlotDataItem | None = None
+        self._start_line: PlaybackLine | None = None
+        self._stop_line: PlaybackLine | None = None
 
         self._config_manager = ConfigManager()
 
         # thread state across async
-        self._load_dialog = None
-        self._pending_load_path = None
-        self._load_thread = None
-        self._load_worker = None
-        self._filter_thread = None
-        self._filter_worker = None
+        self._load_dialog: QDialog | None = None
+        self._pending_load_path: str | None = None
+        self._load_thread: QThread | None = None
+        self._load_worker: FileLoadWorker | None = None
+        self._filter_thread: QThread | None = None
+        self._filter_worker: FilterWorker | None = None
 
-        self._playback_line = None
-        self._playback_start_wall = 0.0
-        self._playback_t_offset = 0.0
-        self._playback_t_stop = 0.0
-        self._paused_position = None
-        self._is_playing = False
-        self._updating_playback_pos = False
+        self._playback_line: PlaybackLine | None = None
+        self._playback_start_wall: float = 0.0
+        self._playback_t_offset: float = 0.0
+        self._playback_t_stop: float = 0.0
+        self._paused_position: float | None = None
+        self._is_playing: bool = False
+        self._updating_playback_pos: bool = False
 
         ext = '.ico' if platform.system() == 'Windows' else '.icns' if platform.system() == 'Darwin' else '.png'
         self._icon_play = QIcon(f'ui/icons/play{ext}')
@@ -100,24 +105,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.filtered_visible_check.toggled.connect(lambda s: self._handle_filters_visible(s, 'filtered'))
 
         self.filter_combo.currentIndexChanged.connect(self._filter_changed_handler)
-
-        for spinbox in (self.filter_low_spin, self.filter_high_spin):
-            spinbox.valueChanged.connect(self._on_filter_param_changed)
-        self.filter_order_spin.valueChanged.connect(self._on_filter_param_changed)
-        self.window_check_filter.toggled.connect(self._on_filter_param_changed)
-        self.filter_combo.currentIndexChanged.connect(self._on_filter_param_changed)
         self.filter_design_combo.currentIndexChanged.connect(self._filter_changed_handler)
-        self.filter_design_combo.currentIndexChanged.connect(self._on_filter_param_changed)
-        self.ripple_spin.valueChanged.connect(self._on_filter_param_changed)
-        self.attenuation_spin.valueChanged.connect(self._on_filter_param_changed)
 
-        for spinbox in (self.low_peak_freq_spin, self.high_peak_freq_spin,
-                        self.min_peak_amp_spin, self.kalman_noise_spin):
-            spinbox.valueChanged.connect(self._on_filter_param_changed)
-        self.kalman_check.toggled.connect(self._on_filter_param_changed)
-        self.normalize_check.toggled.connect(self._on_filter_param_changed)
-        self.window_check_fft.toggled.connect(self._on_filter_param_changed)
-        self.fft_mode_combo.currentIndexChanged.connect(self._on_filter_param_changed)
+        for widget in (self.filter_low_spin, self.filter_high_spin,
+                       self.filter_order_spin, self.ripple_spin,
+                       self.attenuation_spin, self.low_peak_freq_spin,
+                       self.high_peak_freq_spin, self.min_peak_amp_spin,
+                       self.kalman_noise_spin, self.window_check_filter,
+                       self.kalman_check, self.normalize_check,
+                       self.window_check_fft, self.filter_combo,
+                       self.filter_design_combo, self.fft_mode_combo):
+            sig = widget.toggled if hasattr(widget, 'isChecked') else widget.currentIndexChanged if hasattr(widget, 'currentIndex') else widget.valueChanged
+            sig.connect(self._on_filter_param_changed)
 
         self.actionLine_Colors.triggered.connect(self._open_line_colors_dialog)
         self.actionSave_Session.triggered.connect(self._save_session)
