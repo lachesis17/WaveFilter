@@ -269,6 +269,8 @@ class ExportWorker(QObject):
             for f_type, f_args in self._applied_filters:
                 if f_type == "Pitch Shift":
                     signal = librosa.effects.pitch_shift(signal, sr=self._sample_rate, n_steps=f_args[0])
+                elif f_type == "Reverse":
+                    signal = np.flip(signal)
                 else:
                     low_freq, high_freq, order = f_args[0], f_args[1], int(f_args[2])
                     filter_design = f_args[4] if len(f_args) > 4 else 'butter'

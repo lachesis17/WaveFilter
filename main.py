@@ -168,6 +168,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.filter_low_spin.setDecimals(1)
             self.filter_low_spin.setValue(12)
             self._set_design_visible(False)
+        elif filter_type == "Reverse":
+            self.filter_low_spin.setEnabled(False)
+            self.filter_high_spin.setEnabled(False)
+            self.filter_order_spin.setEnabled(False)
+            self._set_design_visible(False)
         elif filter_type == "IFFT / Kalman Filter":
             self.filter_low_spin.setEnabled(False)
             self.filter_high_spin.setEnabled(False)
@@ -806,6 +811,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for f_type, f_args in applied_filters:
             if f_type == "Pitch Shift":
                 signal = librosa.effects.pitch_shift(signal, sr=sample_rate, n_steps=f_args[0])
+            elif f_type == "Reverse":
+                signal = np.flip(signal)
             else:
                 low_freq, high_freq, order = f_args[0], f_args[1], int(f_args[2])
                 filter_design = f_args[4] if len(f_args) > 4 else 'butter'
@@ -855,6 +862,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.filter_obj._filtered = result
             if apply:
                 self.filter_obj._applied_filters.append((filter_type, [n_steps]))
+            return
+
+        if filter_type == "Reverse":
+            self.filter_obj._filtered = np.flip(np.asarray(_signal))
+            if apply:
+                self.filter_obj._applied_filters.append((filter_type, []))
             return
 
         if filter_type == "IFFT / Kalman Filter":
@@ -933,7 +946,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._keep_playback_position()
         filter_type = self.filter_combo.currentText()
 
-        if filter_type in ("IFFT / Kalman Filter", "Pitch Shift"):
+        if filter_type in ("IFFT / Kalman Filter", "Pitch Shift", "Reverse"):
             self._apply_filter(filter_type=filter_type, apply=True, stack=False)
             self.preview_check.setChecked(False)
             self._refresh()
@@ -1165,6 +1178,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for f_type, f_args in self.filter_obj._applied_filters:
             if f_type == "Pitch Shift":
                 params = f"{f_args[0]:+g} semitones"
+            elif f_type == "Reverse":
+                params = ""
             else:
                 params = str(f_args)
             item = QTreeWidgetItem([str(f_type), params])

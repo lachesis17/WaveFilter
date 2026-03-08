@@ -1,6 +1,6 @@
 # <img src="https://github.com/user-attachments/assets/00df788b-5ce5-4b66-8863-53c74a2e9ec7" height="30"> WaveFilter
 
-A desktop signal processing application with PySide6. Load audio or data files, visualise the raw and filtered waveforms alongside their FFT spectra and apply one or more filters in sequence with real-time previews and playback.
+A desktop signal processing application with PySide6. Load audio or data files, visualise the raw and filtered waveforms alongside their FFT spectra and apply one or more filters in sequence with real-time previews and playback. Supports saving and loading of sessions and export to audio or excel files. Along with filters, pitch shifting and reverse can be applied to create exportable looping samples.
 
 ![wavefilter](https://github.com/user-attachments/assets/fae6cdc3-1597-46fa-bb25-5a7f445315c1)
 
@@ -11,8 +11,11 @@ A desktop signal processing application with PySide6. Load audio or data files, 
 - Load WAV, MP3, CSV, and Excel files
 - Real-time filter preview before applying
 - Playback audio with start/stop times and filters applied
-- Stack and clear multiple filters
-- Save and load sessions
+- Looping playback with draggable playback head
+- Stack and clear multiple filters (individual or multi-select)
+- Pitch shift and reverse as additional filter types
+- Trim signal to start/stop selection
+- Save and load sessions (`.wavefilter` format)
 - Export filtered audio to `mp3`, `wav` and `excel`
 - Interactive time-domain and FFT plots
 - Generate synthetic test signals (sine, square, sawtooth, triangle + noise)
@@ -31,6 +34,8 @@ A desktop signal processing application with PySide6. Load audio or data files, 
 | Band Stop      | Low Frequency, High Frequency, Order, Design       | Attenuates a frequency band, passes outside                                        |
 | Notch          | Low Frequency                                      | Narrow band rejection at a single frequency                                        |
 | Savitzky-Golay | Window Length, Poly Order                          | Polynomial smoothing filter                                                        |
+| Pitch Shift    | Semitones (-36 to +36)                             | Shifts pitch without changing duration (via librosa)                               |
+| Reverse        |                                                    | Reverses the signal                                                                |
 | IFFT / Kalman  | Window, Low/High/Amplitude threshold, Kalman noise | Peak-based frequency isolation via inverse FFT, with optional Kalman pre-smoothing |
 
 ## Filter Designs (IIR filters)

@@ -513,6 +513,11 @@
                 </item>
                 <item>
                  <property name="text">
+                  <string>Reverse</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
                   <string>IFFT / Kalman Filter</string>
                  </property>
                 </item>
