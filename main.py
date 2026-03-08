@@ -121,6 +121,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionLine_Colors.triggered.connect(self._open_line_colors_dialog)
         self.actionSave_Session.triggered.connect(self._save_session)
         self.actionLoad_Session.triggered.connect(self._load_session)
+        self.actionTrim.triggered.connect(self._trim_signal)
 
     def _preview_toggled(self, checked):
         if not checked:
@@ -378,6 +379,43 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._load_session_dialog.close()
         QMessageBox.critical(self, "Load error", msg)
         self._load_session_thread.quit()
+
+    def _trim_signal(self):
+        fo = self.filter_obj
+        if not fo or not self._start_line or not self._stop_line:
+            return
+
+        self._stop_audio()
+
+        t_start = self._start_line.value()
+        t_stop = self._stop_line.value()
+        rate_full = fo._rate_full
+
+        # trim display arrays
+        mask = (fo._time >= t_start) & (fo._time <= t_stop)
+        fo._raw = fo._raw[mask]
+        fo._time = np.arange(len(fo._raw)) / (len(fo._raw) / (t_stop - t_start)) if len(fo._raw) > 1 else np.array([0.0])
+
+        # trim full-rate array
+        i_start = max(0, int(t_start * rate_full))
+        i_stop = min(len(fo._raw_full), int(t_stop * rate_full))
+        fo._raw_full = fo._raw_full[i_start:i_stop]
+
+        # rebuild time from sample rate
+        display_rate = len(fo._raw) / (t_stop - t_start) if t_stop > t_start else rate_full
+        fo._time = np.arange(len(fo._raw)) / display_rate
+
+        n = len(fo._raw)
+        duration = fo._time[-1] if n > 1 else 0.0
+        self.info_label.setText(
+            f"Sample Rate: {rate_full} Hz  |  Samples: {len(fo._raw_full)}  |  Duration: {duration:.3f} s"
+        )
+
+        self._clear_plots()
+        self._init_playback_lines()
+        self._refresh()
+        self.play_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
 
     def _generate_test_signal(self):
         """

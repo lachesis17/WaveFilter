@@ -780,6 +780,8 @@
     </property>
     <addaction name="actionSave_Session"/>
     <addaction name="actionLoad_Session"/>
+    <addaction name="separator"/>
+    <addaction name="actionTrim"/>
    </widget>
    <widget class="QMenu" name="menuSettings">
     <property name="title">
@@ -806,6 +808,15 @@
    </property>
    <property name="text">
     <string> Load Session</string>
+   </property>
+  </action>
+  <action name="actionTrim">
+   <property name="icon">
+    <iconset>
+     <normaloff>ui/icons/trim.ico</normaloff>ui/icons/trim.ico</iconset>
+   </property>
+   <property name="text">
+    <string> Trim to Selection</string>
    </property>
   </action>
   <action name="actionLine_Colors">
