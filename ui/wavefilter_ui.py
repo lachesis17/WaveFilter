@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'wavefilter.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.8.0
+## Created by: Qt User Interface Compiler version 6.10.2
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -20,8 +20,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComb
     QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
     QHeaderView, QLabel, QMainWindow, QMenu,
     QMenuBar, QPushButton, QScrollArea, QSizePolicy,
-    QSpinBox, QSplitter, QTreeWidget, QTreeWidgetItem,
-    QVBoxLayout, QWidget)
+    QSlider, QSpinBox, QSplitter, QTreeWidget,
+    QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from pyqtgraph import PlotWidget
 
@@ -135,6 +135,32 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_file.addWidget(self.file_label)
 
+        self.horizontalLayout_volume = QHBoxLayout()
+        self.horizontalLayout_volume.setObjectName(u"horizontalLayout_volume")
+        self.label_volume = QLabel(self.file_group)
+        self.label_volume.setObjectName(u"label_volume")
+
+        self.horizontalLayout_volume.addWidget(self.label_volume)
+
+        self.volume_slider = QSlider(self.file_group)
+        self.volume_slider.setObjectName(u"volume_slider")
+        self.volume_slider.setMinimum(0)
+        self.volume_slider.setMaximum(100)
+        self.volume_slider.setValue(80)
+        self.volume_slider.setOrientation(Qt.Horizontal)
+
+        self.horizontalLayout_volume.addWidget(self.volume_slider)
+
+        self.volume_value_label = QLabel(self.file_group)
+        self.volume_value_label.setObjectName(u"volume_value_label")
+        self.volume_value_label.setMinimumSize(QSize(35, 0))
+        self.volume_value_label.setAlignment(Qt.AlignRight|Qt.AlignVCenter)
+
+        self.horizontalLayout_volume.addWidget(self.volume_value_label)
+
+
+        self.verticalLayout_file.addLayout(self.horizontalLayout_volume)
+
         self.horizontalLayout_playback = QHBoxLayout()
         self.horizontalLayout_playback.setObjectName(u"horizontalLayout_playback")
         self.play_button = QPushButton(self.file_group)
@@ -187,7 +213,7 @@ class Ui_MainWindow(object):
         self.label_fft_mode = QLabel(self.fft_group)
         self.label_fft_mode.setObjectName(u"label_fft_mode")
 
-        self.formLayout_fft_mode.setWidget(0, QFormLayout.LabelRole, self.label_fft_mode)
+        self.formLayout_fft_mode.setWidget(0, QFormLayout.ItemRole.LabelRole, self.label_fft_mode)
 
         self.fft_mode_combo = QComboBox(self.fft_group)
         self.fft_mode_combo.addItem("")
@@ -202,7 +228,7 @@ class Ui_MainWindow(object):
         self.fft_mode_combo.addItem("")
         self.fft_mode_combo.setObjectName(u"fft_mode_combo")
 
-        self.formLayout_fft_mode.setWidget(0, QFormLayout.FieldRole, self.fft_mode_combo)
+        self.formLayout_fft_mode.setWidget(0, QFormLayout.ItemRole.FieldRole, self.fft_mode_combo)
 
 
         self.verticalLayout_fft.addLayout(self.formLayout_fft_mode)
@@ -218,7 +244,7 @@ class Ui_MainWindow(object):
         self.label_low_freq = QLabel(self.fft_group)
         self.label_low_freq.setObjectName(u"label_low_freq")
 
-        self.formLayout_fft_thresh.setWidget(0, QFormLayout.LabelRole, self.label_low_freq)
+        self.formLayout_fft_thresh.setWidget(0, QFormLayout.ItemRole.LabelRole, self.label_low_freq)
 
         self.low_peak_freq_spin = QDoubleSpinBox(self.fft_group)
         self.low_peak_freq_spin.setObjectName(u"low_peak_freq_spin")
@@ -227,12 +253,12 @@ class Ui_MainWindow(object):
         self.low_peak_freq_spin.setSingleStep(10.000000000000000)
         self.low_peak_freq_spin.setValue(300.000000000000000)
 
-        self.formLayout_fft_thresh.setWidget(0, QFormLayout.FieldRole, self.low_peak_freq_spin)
+        self.formLayout_fft_thresh.setWidget(0, QFormLayout.ItemRole.FieldRole, self.low_peak_freq_spin)
 
         self.label_high_freq = QLabel(self.fft_group)
         self.label_high_freq.setObjectName(u"label_high_freq")
 
-        self.formLayout_fft_thresh.setWidget(1, QFormLayout.LabelRole, self.label_high_freq)
+        self.formLayout_fft_thresh.setWidget(1, QFormLayout.ItemRole.LabelRole, self.label_high_freq)
 
         self.high_peak_freq_spin = QDoubleSpinBox(self.fft_group)
         self.high_peak_freq_spin.setObjectName(u"high_peak_freq_spin")
@@ -241,12 +267,12 @@ class Ui_MainWindow(object):
         self.high_peak_freq_spin.setSingleStep(10.000000000000000)
         self.high_peak_freq_spin.setValue(310.000000000000000)
 
-        self.formLayout_fft_thresh.setWidget(1, QFormLayout.FieldRole, self.high_peak_freq_spin)
+        self.formLayout_fft_thresh.setWidget(1, QFormLayout.ItemRole.FieldRole, self.high_peak_freq_spin)
 
         self.label_min_amp = QLabel(self.fft_group)
         self.label_min_amp.setObjectName(u"label_min_amp")
 
-        self.formLayout_fft_thresh.setWidget(2, QFormLayout.LabelRole, self.label_min_amp)
+        self.formLayout_fft_thresh.setWidget(2, QFormLayout.ItemRole.LabelRole, self.label_min_amp)
 
         self.min_peak_amp_spin = QDoubleSpinBox(self.fft_group)
         self.min_peak_amp_spin.setObjectName(u"min_peak_amp_spin")
@@ -256,7 +282,7 @@ class Ui_MainWindow(object):
         self.min_peak_amp_spin.setSingleStep(0.010000000000000)
         self.min_peak_amp_spin.setValue(0.150000000000000)
 
-        self.formLayout_fft_thresh.setWidget(2, QFormLayout.FieldRole, self.min_peak_amp_spin)
+        self.formLayout_fft_thresh.setWidget(2, QFormLayout.ItemRole.FieldRole, self.min_peak_amp_spin)
 
 
         self.verticalLayout_fft.addLayout(self.formLayout_fft_thresh)
@@ -352,7 +378,7 @@ class Ui_MainWindow(object):
         self.label_filter_low = QLabel(self.filters_group)
         self.label_filter_low.setObjectName(u"label_filter_low")
 
-        self.formLayout_filter_params.setWidget(0, QFormLayout.LabelRole, self.label_filter_low)
+        self.formLayout_filter_params.setWidget(0, QFormLayout.ItemRole.LabelRole, self.label_filter_low)
 
         self.filter_low_spin = QDoubleSpinBox(self.filters_group)
         self.filter_low_spin.setObjectName(u"filter_low_spin")
@@ -361,12 +387,12 @@ class Ui_MainWindow(object):
         self.filter_low_spin.setSingleStep(10.000000000000000)
         self.filter_low_spin.setValue(150.000000000000000)
 
-        self.formLayout_filter_params.setWidget(0, QFormLayout.FieldRole, self.filter_low_spin)
+        self.formLayout_filter_params.setWidget(0, QFormLayout.ItemRole.FieldRole, self.filter_low_spin)
 
         self.label_filter_high = QLabel(self.filters_group)
         self.label_filter_high.setObjectName(u"label_filter_high")
 
-        self.formLayout_filter_params.setWidget(1, QFormLayout.LabelRole, self.label_filter_high)
+        self.formLayout_filter_params.setWidget(1, QFormLayout.ItemRole.LabelRole, self.label_filter_high)
 
         self.filter_high_spin = QDoubleSpinBox(self.filters_group)
         self.filter_high_spin.setObjectName(u"filter_high_spin")
@@ -375,12 +401,12 @@ class Ui_MainWindow(object):
         self.filter_high_spin.setSingleStep(10.000000000000000)
         self.filter_high_spin.setValue(250.000000000000000)
 
-        self.formLayout_filter_params.setWidget(1, QFormLayout.FieldRole, self.filter_high_spin)
+        self.formLayout_filter_params.setWidget(1, QFormLayout.ItemRole.FieldRole, self.filter_high_spin)
 
         self.label_filter_order = QLabel(self.filters_group)
         self.label_filter_order.setObjectName(u"label_filter_order")
 
-        self.formLayout_filter_params.setWidget(2, QFormLayout.LabelRole, self.label_filter_order)
+        self.formLayout_filter_params.setWidget(2, QFormLayout.ItemRole.LabelRole, self.label_filter_order)
 
         self.filter_order_spin = QSpinBox(self.filters_group)
         self.filter_order_spin.setObjectName(u"filter_order_spin")
@@ -388,12 +414,12 @@ class Ui_MainWindow(object):
         self.filter_order_spin.setMaximum(20)
         self.filter_order_spin.setValue(1)
 
-        self.formLayout_filter_params.setWidget(2, QFormLayout.FieldRole, self.filter_order_spin)
+        self.formLayout_filter_params.setWidget(2, QFormLayout.ItemRole.FieldRole, self.filter_order_spin)
 
         self.label_filter_design = QLabel(self.filters_group)
         self.label_filter_design.setObjectName(u"label_filter_design")
 
-        self.formLayout_filter_params.setWidget(3, QFormLayout.LabelRole, self.label_filter_design)
+        self.formLayout_filter_params.setWidget(3, QFormLayout.ItemRole.LabelRole, self.label_filter_design)
 
         self.filter_design_combo = QComboBox(self.filters_group)
         self.filter_design_combo.addItem("")
@@ -403,12 +429,12 @@ class Ui_MainWindow(object):
         self.filter_design_combo.addItem("")
         self.filter_design_combo.setObjectName(u"filter_design_combo")
 
-        self.formLayout_filter_params.setWidget(3, QFormLayout.FieldRole, self.filter_design_combo)
+        self.formLayout_filter_params.setWidget(3, QFormLayout.ItemRole.FieldRole, self.filter_design_combo)
 
         self.label_ripple = QLabel(self.filters_group)
         self.label_ripple.setObjectName(u"label_ripple")
 
-        self.formLayout_filter_params.setWidget(4, QFormLayout.LabelRole, self.label_ripple)
+        self.formLayout_filter_params.setWidget(4, QFormLayout.ItemRole.LabelRole, self.label_ripple)
 
         self.ripple_spin = QDoubleSpinBox(self.filters_group)
         self.ripple_spin.setObjectName(u"ripple_spin")
@@ -418,12 +444,12 @@ class Ui_MainWindow(object):
         self.ripple_spin.setSingleStep(0.100000000000000)
         self.ripple_spin.setValue(3.000000000000000)
 
-        self.formLayout_filter_params.setWidget(4, QFormLayout.FieldRole, self.ripple_spin)
+        self.formLayout_filter_params.setWidget(4, QFormLayout.ItemRole.FieldRole, self.ripple_spin)
 
         self.label_attenuation = QLabel(self.filters_group)
         self.label_attenuation.setObjectName(u"label_attenuation")
 
-        self.formLayout_filter_params.setWidget(5, QFormLayout.LabelRole, self.label_attenuation)
+        self.formLayout_filter_params.setWidget(5, QFormLayout.ItemRole.LabelRole, self.label_attenuation)
 
         self.attenuation_spin = QDoubleSpinBox(self.filters_group)
         self.attenuation_spin.setObjectName(u"attenuation_spin")
@@ -433,7 +459,7 @@ class Ui_MainWindow(object):
         self.attenuation_spin.setSingleStep(0.100000000000000)
         self.attenuation_spin.setValue(20.000000000000000)
 
-        self.formLayout_filter_params.setWidget(5, QFormLayout.FieldRole, self.attenuation_spin)
+        self.formLayout_filter_params.setWidget(5, QFormLayout.ItemRole.FieldRole, self.attenuation_spin)
 
 
         self.verticalLayout_filters.addLayout(self.formLayout_filter_params)
@@ -520,6 +546,8 @@ class Ui_MainWindow(object):
         self.open_button.setText(QCoreApplication.translate("MainWindow", u"Open File", None))
         self.generate_button.setText(QCoreApplication.translate("MainWindow", u"Generate Test Signal", None))
         self.file_label.setText(QCoreApplication.translate("MainWindow", u"No file loaded", None))
+        self.label_volume.setText(QCoreApplication.translate("MainWindow", u"Volume", None))
+        self.volume_value_label.setText(QCoreApplication.translate("MainWindow", u"80%", None))
         self.play_button.setText(QCoreApplication.translate("MainWindow", u" Play", None))
         self.stop_button.setText(QCoreApplication.translate("MainWindow", u"  Stop", None))
         self.fft_group.setTitle(QCoreApplication.translate("MainWindow", u"FFT", None))

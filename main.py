@@ -20,8 +20,9 @@ pg.setConfigOptions(useOpenGL=True, enableExperimental=True)
 from src.config import ConfigManager
 from src.filters import Filters
 from src.helpers import (ColumnPickerDialog, ExportWorker, FileLoadWorker,
-                         FilterWorker, SessionSaveWorker, SessionLoadWorker,
-                         LineColorsDialog, PlaybackLine)
+                         FilterWorker, LineColorsDialog, PlaybackLine,
+                         PlaybackWorker, SessionSaveWorker,
+                         SessionLoadWorker)
 from ui.wavefilter_ui import Ui_MainWindow
 
 appid = 'WaveFilter'
@@ -60,12 +61,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._filter_worker: FilterWorker | None = None
 
         self._playback_line: PlaybackLine | None = None
+        self._playback_stream: sd.OutputStream | None = None
+        self._playback_buffer: np.ndarray | None = None
+        self._playback_pos: int = 0
         self._playback_start_wall: float = 0.0
         self._playback_t_offset: float = 0.0
         self._playback_t_stop: float = 0.0
         self._paused_position: float | None = None
         self._is_playing: bool = False
         self._updating_playback_pos: bool = False
+        self._was_playing: bool = False
+        self._filtered_full_cache: np.ndarray | None = None
+        self._filtered_full_rate: int = 0
+        self._playback_thread: QThread | None = None
+        self._playback_worker: PlaybackWorker | None = None
 
         ext = '.ico' if platform.system() == 'Windows' else '.icns' if platform.system() == 'Darwin' else '.png'
         self._icon_play = QIcon(f'ui/icons/play{ext}')
@@ -74,6 +83,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._icon_stop = QIcon(f'ui/icons/stop{ext}')
 
         self.setWindowIcon(QIcon(f'ui/icons/icon{ext}'))
+
+        self._volume: float = 0.8
+        saved_volume = self._config_manager.get_volume()
+        self._volume = saved_volume / 100.0
+        self.volume_slider.setValue(saved_volume)
+        self.volume_value_label.setText(f"{saved_volume}%")
 
         self._setup_plots()
         self._connect_signals()
@@ -123,6 +138,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionLoad_Session.triggered.connect(self._load_session)
         self.actionTrim.triggered.connect(self._trim_signal)
         self.actionExport.triggered.connect(self._export_signal)
+
+        self.volume_slider.valueChanged.connect(self._on_volume_changed)
+
+    def _on_volume_changed(self, value):
+        self._volume = value / 100.0
+        self.volume_value_label.setText(f"{value}%")
+        self._config_manager.set_volume(value)
 
     def _preview_toggled(self, checked):
         if not checked:
@@ -620,8 +642,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._start_line.label.fill = pg.mkBrush(20, 20, 20)
         self._start_line.label.color = pg.mkBrush(0, 180, 80)
         self._start_line.label.orthoPos = 0.96
-        self._start_line.doubleClicked.connect(lambda: self._start_line.setValue(0.0))
+        self._start_line.doubleClicked.connect(self._on_start_line_double_clicked)
         self._start_line.sigPositionChanged.connect(self._clamp_playback_start)
+        self._start_line.sigPositionChangeFinished.connect(self._on_start_line_released)
 
         self._stop_line = PlaybackLine(
             pos=t_max, angle=90, movable=True,
@@ -632,10 +655,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._stop_line.label.fill = pg.mkBrush(20, 20, 20)
         self._stop_line.label.color = pg.mkBrush(200, 0, 0)
         self._stop_line.label.orthoPos = 0.96
-        self._stop_line.doubleClicked.connect(
-            lambda: self._stop_line.setValue(float(self.filter_obj._time[-1]))
-        )
+        self._stop_line.doubleClicked.connect(self._on_stop_line_double_clicked)
         self._stop_line.sigPositionChanged.connect(self._clamp_playback_stop)
+        self._stop_line.sigPositionChangeFinished.connect(self._on_stop_line_released)
 
         self._playback_line = PlaybackLine(
             pos=0.0, angle=90, movable=True,
@@ -671,6 +693,38 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if clamped != v:
             self._stop_line.setValue(clamped)
 
+    def _on_start_line_double_clicked(self):
+        self._start_line.setValue(0.0)
+        if self._is_playing:
+            self._paused_position = 0.0
+            self._restart_playback()
+
+    def _on_stop_line_double_clicked(self):
+        t_end = float(self.filter_obj._time[-1])
+        self._stop_line.setValue(t_end)
+        if self._is_playing:
+            elapsed = _time.monotonic() - self._playback_start_wall
+            looped = elapsed % self._playback_duration if self._playback_duration > 0 else 0.0
+            self._paused_position = self._playback_t_offset + looped
+            self._restart_playback()
+
+    def _on_start_line_released(self):
+        if self._is_playing:
+            self._paused_position = self._start_line.value()
+            self._restart_playback()
+
+    def _on_stop_line_released(self):
+        if not self._is_playing:
+            return
+        elapsed = _time.monotonic() - self._playback_start_wall
+        looped = elapsed % self._playback_duration if self._playback_duration > 0 else 0.0
+        current_t = self._playback_t_offset + looped
+        if current_t < self._stop_line.value():
+            self._paused_position = current_t
+        else:
+            self._paused_position = self._start_line.value()
+        self._restart_playback()
+
     def _clear_plots(self):
         self.fft_plot.clear()
         self.signal_plot.clear()
@@ -688,6 +742,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 delattr(self, attr)
 
     def _refresh(self):
+        self._invalidate_playback_cache()
         self._populate_filter_list()
         self._apply_all_filters()
         self._replot()
@@ -803,28 +858,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         t = self.filter_obj._time
         return 1.0 / (t[1] - t[0]) if len(t) > 1 else 1.0
 
-    @staticmethod
-    def _apply_filters_full_rate(signal, sample_rate, applied_filters):
-        """
-        Apply filter stack to a full sample rate signal.
-        """
-        for f_type, f_args in applied_filters:
-            if f_type == "Pitch Shift":
-                signal = librosa.effects.pitch_shift(signal, sr=sample_rate, n_steps=f_args[0])
-            elif f_type == "Reverse":
-                signal = np.flip(signal)
-            else:
-                low_freq, high_freq, order = f_args[0], f_args[1], int(f_args[2])
-                filter_design = f_args[4] if len(f_args) > 4 else 'butter'
-                ripple = f_args[5] if len(f_args) > 5 else 3.0
-                attenuation = f_args[6] if len(f_args) > 6 else 60.0
-                result = Filters.apply_standard_filter(
-                    signal, sample_rate, f_type, low_freq, high_freq, order,
-                    filter_design, ripple, attenuation)
-                if result is not None:
-                    signal = result
-        return signal
-
     def _get_filter_params(self):
         return (
             self.window_check_filter.isChecked(),
@@ -933,12 +966,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._populate_legend()
 
     def _keep_playback_position(self):
-        pos = self._playback_line.value() if self._playback_line and self._playback_line.isVisible() else None
-        self._stop_audio()
-        if pos and self._playback_line:
-            self._playback_line.setValue(pos)
-            self._playback_line.setVisible(True)
-            self._paused_position = pos
+        if self._is_playing and self._playback_line and self._playback_line.isVisible():
+            elapsed = _time.monotonic() - self._playback_start_wall
+            looped = elapsed % self._playback_duration if self._playback_duration > 0 else 0.0
+            self._paused_position = self._playback_t_offset + looped
+            self._was_playing = True
+        else:
+            self._was_playing = False
+
+    def _resume_if_was_playing(self):
+        if self._was_playing:
+            self._was_playing = False
+            self._restart_playback()
 
     def _apply_filter_committed(self):
         if self.filter_obj is None:
@@ -946,10 +985,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._keep_playback_position()
         filter_type = self.filter_combo.currentText()
 
-        if filter_type in ("IFFT / Kalman Filter", "Pitch Shift", "Reverse"):
+        if filter_type in ("IFFT / Kalman Filter", "Reverse"):
             self._apply_filter(filter_type=filter_type, apply=True, stack=False)
             self.preview_check.setChecked(False)
             self._refresh()
+            self._resume_if_was_playing()
+            return
+
+        if filter_type == "Pitch Shift":
+            self.apply_filter_button.setEnabled(False)
+            self.apply_filter_button.setText("Applying...")
+            self._filter_dialog = self._show_progress("Applying filter", "Applying Pitch Shift...")
+            QTimer.singleShot(0, self._apply_pitch_shift_deferred)  # defer to call paint before blocking
             return
 
         sample_rate = self._get_sample_rate()
@@ -958,6 +1005,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.apply_filter_button.setEnabled(False)
         self.apply_filter_button.setText("Applying...")
+        self._filter_dialog = self._show_progress("Applying filter", f"Applying {filter_type}...")
 
         thread = QThread()
         worker = FilterWorker(signal, sample_rate, filter_type,
@@ -965,17 +1013,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                               filter_design, ripple, attenuation, window_arg)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.finished.connect(thread.quit)  # stop thread event loop on finish
         worker.finished.connect(self._on_filter_done, Qt.ConnectionType.QueuedConnection)
         worker.error.connect(self._on_filter_error, Qt.ConnectionType.QueuedConnection)
-        thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
         self._filter_thread = thread
         self._filter_worker = worker
         thread.start()
 
     def _on_filter_done(self, payload):
         result, filter_type, low_freq, high_freq, order, window_arg, filter_design, ripple, attenuation = payload
+        self._filter_dialog.close()
         if self._filter_thread is not None:
             self._filter_thread.quit()
             self._filter_thread.wait()  # block until thread stops before dropping references
@@ -996,8 +1042,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self._refresh()
         self.apply_filter_button.setEnabled(True)
         self.apply_filter_button.setText("Apply Filter")
+        self._resume_if_was_playing()
 
     def _on_filter_error(self, msg):
+        self._filter_dialog.close()
         if self._filter_thread is not None:
             self._filter_thread.quit()
             self._filter_thread.wait()
@@ -1006,6 +1054,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.apply_filter_button.setEnabled(True)
         self.apply_filter_button.setText("Apply Filter")
         QMessageBox.critical(self, "Filter error", msg)
+
+    def _apply_pitch_shift_deferred(self):
+        self._apply_filter(filter_type="Pitch Shift", apply=True, stack=False)
+        self._filter_dialog.close()
+        self.apply_filter_button.setEnabled(True)
+        self.apply_filter_button.setText("Apply Filter")
+        self.preview_check.setChecked(False)
+        self._refresh()
+        self._resume_if_was_playing()
 
     def _clear_filters(self):
         if not self.filter_obj or not self.filter_obj._applied_filters:
@@ -1025,10 +1082,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for f_type, f_args in self.filter_obj._applied_filters:
             self._apply_filter(filter_type=f_type, apply=False, stack=True, _args=f_args)
 
+        self._invalidate_playback_cache()
         self.preview_check.setChecked(False)
         self._populate_filter_list()
         self._replot()
         self._populate_legend()
+        self._resume_if_was_playing()
 
     def _toggle_playback(self):
         if self._is_playing:
@@ -1036,14 +1095,44 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             self._play_audio()
 
+    def _invalidate_playback_cache(self):
+        self._filtered_full_cache = None
+
     def _play_audio(self):
         if self.filter_obj is None:
             return
-        signal = np.asarray(self.filter_obj._raw_full, dtype=float)
-        sample_rate = self.filter_obj._rate_full
-        signal = self._apply_filters_full_rate(signal, sample_rate, self.filter_obj._applied_filters)
-        signal = np.asarray(signal, dtype=np.float32)
+        # use cache, or thread playback
+        if self._filtered_full_cache is not None:
+            self._start_playback_stream(self._filtered_full_cache, self._filtered_full_rate)
+            return
 
+        fo = self.filter_obj
+        self._prep_dialog = self._show_progress("Preparing playback", "Applying filters to signal...")
+
+        worker = PlaybackWorker(fo._raw_full, fo._rate_full, fo._applied_filters)
+        thread = QThread()
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._on_playback_prep_finished, Qt.ConnectionType.QueuedConnection)
+        worker.error.connect(self._on_playback_prep_error, Qt.ConnectionType.QueuedConnection)
+        thread.start()
+        self._playback_thread = thread
+        self._playback_worker = worker
+
+    def _on_playback_prep_finished(self, result):
+        signal, sample_rate = result
+        self._prep_dialog.close()
+        self._playback_thread.quit()
+        self._filtered_full_cache = signal
+        self._filtered_full_rate = sample_rate
+        self._start_playback_stream(signal, sample_rate)
+
+    def _on_playback_prep_error(self, msg):
+        self._prep_dialog.close()
+        self._playback_thread.quit()
+        self.info_label.setText(f"Playback error: {msg}")
+
+    def _start_playback_stream(self, signal, sample_rate):
         t_region_start = 0.0
         t_region_stop = len(signal) / sample_rate
         if self._start_line and self._stop_line:
@@ -1061,19 +1150,35 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
         signal = signal[i_start:i_stop]
 
-        max_val = np.max(np.abs(signal))
-        if max_val > 0:
-            signal = signal / max_val
-        valid_rates = {8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000}
-        if sample_rate not in valid_rates:
-            signal = librosa.resample(signal, orig_sr=sample_rate, target_sr=22050)
-            sample_rate = 22050
-
         if resume_offset > 0:
             resume_samples = int(resume_offset * sample_rate)
             signal = np.roll(signal, -resume_samples)
 
-        sd.play(signal, sample_rate, loop=True)
+        # store buffer for streaming playback
+        self._playback_buffer = signal
+        self._playback_pos = 0
+
+        def callback(outdata, frames, time_info, status):
+            buf = self._playback_buffer
+            n = len(buf)
+            pos = self._playback_pos
+            vol = self._volume
+            end = pos + frames
+            if end <= n:
+                outdata[:, 0] = buf[pos:end] * vol
+            else:
+                # loop to fill remainder from start of buffer
+                first = n - pos
+                outdata[:first, 0] = buf[pos:] * vol
+                remaining = frames - first
+                outdata[first:, 0] = buf[:remaining] * vol
+                end = remaining
+            self._playback_pos = end % n
+
+        self._playback_stream = sd.OutputStream(
+            samplerate=sample_rate, channels=1, dtype='float32',
+            callback=callback)
+        self._playback_stream.start()
 
         self._playback_start_wall = _time.monotonic() - resume_offset
         self._playback_t_offset = t_region_start
@@ -1095,6 +1200,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._playback_timer.timeout.connect(self._check_playback)
         self._playback_timer.start(50)
 
+    def _restart_playback(self):
+        if hasattr(self, '_playback_stream') and self._playback_stream:
+            self._playback_stream.stop()
+            self._playback_stream.close()
+            self._playback_stream = None
+        if hasattr(self, '_playback_timer'):
+            self._playback_timer.stop()
+        self._is_playing = False
+        self._play_audio()
+
     def _pause_audio(self):
         elapsed = _time.monotonic() - self._playback_start_wall
         if self._playback_duration > 0:
@@ -1102,7 +1217,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             looped = 0.0
         self._paused_position = self._playback_t_offset + looped
-        sd.stop()
+        if hasattr(self, '_playback_stream') and self._playback_stream:
+            self._playback_stream.stop()
+            self._playback_stream.close()
+            self._playback_stream = None
         if hasattr(self, '_playback_timer'):
             self._playback_timer.stop()
         self._is_playing = False
@@ -1111,7 +1229,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def _check_playback(self):
         try:
-            active = sd.get_stream().active
+            active = hasattr(self, '_playback_stream') and self._playback_stream and self._playback_stream.active
         except (AttributeError, RuntimeError):
             active = False
 
@@ -1137,7 +1255,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self._playback_line.setVisible(False)
 
     def _stop_audio(self):
-        sd.stop()
+        if hasattr(self, '_playback_stream') and self._playback_stream:
+            self._playback_stream.stop()
+            self._playback_stream.close()
+            self._playback_stream = None
         if hasattr(self, '_playback_timer'):
             self._playback_timer.stop()
         self._is_playing = False
@@ -1162,12 +1283,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self._playback_line.setValue(clamped)
             return
         if self._is_playing:
-            sd.stop()
-            if hasattr(self, '_playback_timer'):
-                self._playback_timer.stop()
-            self._is_playing = False
             self._paused_position = clamped
-            self._play_audio()
+            self._restart_playback()
         elif self._paused_position:
             self._paused_position = clamped
 

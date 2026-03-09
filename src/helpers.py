@@ -251,6 +251,53 @@ class SessionLoadWorker(QObject):
             self.error.emit(str(e))
 
 
+class PlaybackWorker(QObject):
+    finished = Signal(object)  # (signal, sample_rate)
+    error = Signal(str)
+
+    def __init__(self, signal, sample_rate, applied_filters):
+        super().__init__()
+        self._signal = signal
+        self._sample_rate = sample_rate
+        self._applied_filters = applied_filters
+
+    def run(self):
+        try:
+            import librosa
+            from src.filters import Filters
+
+            signal = self._signal.copy()
+            sample_rate = self._sample_rate
+            for f_type, f_args in self._applied_filters:
+                if f_type == "Pitch Shift":
+                    signal = librosa.effects.pitch_shift(signal, sr=sample_rate, n_steps=f_args[0])
+                elif f_type == "Reverse":
+                    signal = np.flip(signal)
+                else:
+                    low_freq, high_freq, order = f_args[0], f_args[1], int(f_args[2])
+                    filter_design = f_args[4] if len(f_args) > 4 else 'butter'
+                    ripple = f_args[5] if len(f_args) > 5 else 3.0
+                    attenuation = f_args[6] if len(f_args) > 6 else 60.0
+                    result = Filters.apply_standard_filter(
+                        signal, sample_rate, f_type, low_freq, high_freq, order,
+                        filter_design, ripple, attenuation)
+                    if result is not None:
+                        signal = result
+
+            signal = np.asarray(signal, dtype=np.float32)
+            max_val = np.max(np.abs(signal))
+            if max_val > 0:
+                signal = signal / max_val
+            valid_rates = {8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000}
+            if sample_rate not in valid_rates:
+                signal = librosa.resample(signal, orig_sr=sample_rate, target_sr=22050)
+                sample_rate = 22050
+
+            self.finished.emit((signal, sample_rate))
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class ExportWorker(QObject):
     finished = Signal()
     error = Signal(str)

@@ -70,3 +70,18 @@ class ConfigManager():
             self.config['line_colors'][key] = ','.join(str(c) for c in rgb)
         with open(CONFIG_FILE_FULL, 'w') as configfile:
             self.config.write(configfile)
+
+    def get_volume(self) -> int:
+        if 'playback' not in self.config:
+            return 80
+        try:
+            return max(0, min(100, int(self.config['playback'].get('volume', '80'))))
+        except ValueError:
+            return 80
+
+    def set_volume(self, volume: int):
+        if 'playback' not in self.config:
+            self.config['playback'] = {}
+        self.config['playback']['volume'] = str(volume)
+        with open(CONFIG_FILE_FULL, 'w') as configfile:
+            self.config.write(configfile)
