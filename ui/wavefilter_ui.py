@@ -88,7 +88,7 @@ class Ui_MainWindow(object):
         self.signal_plot.setObjectName(u"signal_plot")
         sizePolicy2 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         sizePolicy2.setHorizontalStretch(0)
-        sizePolicy2.setVerticalStretch(3)
+        sizePolicy2.setVerticalStretch(4)
         sizePolicy2.setHeightForWidth(self.signal_plot.sizePolicy().hasHeightForWidth())
         self.signal_plot.setSizePolicy(sizePolicy2)
         self.signal_plot.setMinimumSize(QSize(400, 260))
@@ -107,7 +107,7 @@ class Ui_MainWindow(object):
         self.control_scroll.setWidgetResizable(True)
         self.scroll_contents = QWidget()
         self.scroll_contents.setObjectName(u"scroll_contents")
-        self.scroll_contents.setGeometry(QRect(0, 0, 395, 933))
+        self.scroll_contents.setGeometry(QRect(0, 0, 358, 933))
         self.verticalLayout_panel = QVBoxLayout(self.scroll_contents)
         self.verticalLayout_panel.setObjectName(u"verticalLayout_panel")
         self.file_group = QGroupBox(self.scroll_contents)
@@ -154,7 +154,7 @@ class Ui_MainWindow(object):
         self.volume_value_label = QLabel(self.file_group)
         self.volume_value_label.setObjectName(u"volume_value_label")
         self.volume_value_label.setMinimumSize(QSize(35, 0))
-        self.volume_value_label.setAlignment(Qt.AlignRight|Qt.AlignVCenter)
+        self.volume_value_label.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
 
         self.horizontalLayout_volume.addWidget(self.volume_value_label)
 
@@ -219,13 +219,6 @@ class Ui_MainWindow(object):
         self.fft_mode_combo.addItem("")
         self.fft_mode_combo.addItem("")
         self.fft_mode_combo.addItem("")
-        self.fft_mode_combo.addItem("")
-        self.fft_mode_combo.addItem("")
-        self.fft_mode_combo.addItem("")
-        self.fft_mode_combo.addItem("")
-        self.fft_mode_combo.addItem("")
-        self.fft_mode_combo.addItem("")
-        self.fft_mode_combo.addItem("")
         self.fft_mode_combo.setObjectName(u"fft_mode_combo")
 
         self.formLayout_fft_mode.setWidget(0, QFormLayout.ItemRole.FieldRole, self.fft_mode_combo)
@@ -287,36 +280,6 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_fft.addLayout(self.formLayout_fft_thresh)
 
-        self.horizontalLayout_kalman = QHBoxLayout()
-        self.horizontalLayout_kalman.setObjectName(u"horizontalLayout_kalman")
-        self.kalman_check = QCheckBox(self.fft_group)
-        self.kalman_check.setObjectName(u"kalman_check")
-
-        self.horizontalLayout_kalman.addWidget(self.kalman_check)
-
-        self.label_kalman_noise = QLabel(self.fft_group)
-        self.label_kalman_noise.setObjectName(u"label_kalman_noise")
-
-        self.horizontalLayout_kalman.addWidget(self.label_kalman_noise)
-
-        self.kalman_noise_spin = QDoubleSpinBox(self.fft_group)
-        self.kalman_noise_spin.setObjectName(u"kalman_noise_spin")
-        self.kalman_noise_spin.setDecimals(2)
-        self.kalman_noise_spin.setMinimum(0.100000000000000)
-        self.kalman_noise_spin.setMaximum(10.000000000000000)
-        self.kalman_noise_spin.setSingleStep(0.100000000000000)
-        self.kalman_noise_spin.setValue(0.500000000000000)
-
-        self.horizontalLayout_kalman.addWidget(self.kalman_noise_spin)
-
-
-        self.verticalLayout_fft.addLayout(self.horizontalLayout_kalman)
-
-        self.apply_fft_button = QPushButton(self.fft_group)
-        self.apply_fft_button.setObjectName(u"apply_fft_button")
-
-        self.verticalLayout_fft.addWidget(self.apply_fft_button)
-
 
         self.verticalLayout_panel.addWidget(self.fft_group)
 
@@ -357,7 +320,6 @@ class Ui_MainWindow(object):
         self.horizontalLayout_filter_top.addWidget(self.window_check_filter)
 
         self.filter_combo = QComboBox(self.filters_group)
-        self.filter_combo.addItem("")
         self.filter_combo.addItem("")
         self.filter_combo.addItem("")
         self.filter_combo.addItem("")
@@ -555,15 +517,8 @@ class Ui_MainWindow(object):
         self.window_check_fft.setText(QCoreApplication.translate("MainWindow", u"Hanning Window", None))
         self.label_fft_mode.setText(QCoreApplication.translate("MainWindow", u"FFT Mode", None))
         self.fft_mode_combo.setItemText(0, QCoreApplication.translate("MainWindow", u"FFT - Fast Fourier Transform", None))
-        self.fft_mode_combo.setItemText(1, QCoreApplication.translate("MainWindow", u"IFFT - Inverse FFT", None))
-        self.fft_mode_combo.setItemText(2, QCoreApplication.translate("MainWindow", u"RFFT - FFT of strictly real-valued sequence", None))
-        self.fft_mode_combo.setItemText(3, QCoreApplication.translate("MainWindow", u"IRFFT - Inverse of RFFT", None))
-        self.fft_mode_combo.setItemText(4, QCoreApplication.translate("MainWindow", u"HFFT - FFT of a Hermitian sequence (real spectrum)", None))
-        self.fft_mode_combo.setItemText(5, QCoreApplication.translate("MainWindow", u"IHFFT - Inverse of HFFT", None))
-        self.fft_mode_combo.setItemText(6, QCoreApplication.translate("MainWindow", u"DCT - Discrete cosine transform", None))
-        self.fft_mode_combo.setItemText(7, QCoreApplication.translate("MainWindow", u"IDCT - Inverse DCT", None))
-        self.fft_mode_combo.setItemText(8, QCoreApplication.translate("MainWindow", u"DST - Discrete sine transform", None))
-        self.fft_mode_combo.setItemText(9, QCoreApplication.translate("MainWindow", u"IDST - Inverse DST", None))
+        self.fft_mode_combo.setItemText(1, QCoreApplication.translate("MainWindow", u"DCT - Discrete cosine transform", None))
+        self.fft_mode_combo.setItemText(2, QCoreApplication.translate("MainWindow", u"DST - Discrete sine transform", None))
 
         self.label_freq_thresh.setText(QCoreApplication.translate("MainWindow", u"\u2500\u2500 Frequency Thresholds \u2500\u2500", None))
         self.label_low_freq.setText(QCoreApplication.translate("MainWindow", u"Low Frequency", None))
@@ -573,9 +528,6 @@ class Ui_MainWindow(object):
         self.high_peak_freq_spin.setPrefix(QCoreApplication.translate("MainWindow", u"> ", None))
         self.high_peak_freq_spin.setSuffix(QCoreApplication.translate("MainWindow", u" Hz", None))
         self.label_min_amp.setText(QCoreApplication.translate("MainWindow", u"Min Peak Amplitude", None))
-        self.kalman_check.setText(QCoreApplication.translate("MainWindow", u"Apply Kalman Filter", None))
-        self.label_kalman_noise.setText(QCoreApplication.translate("MainWindow", u"Noise:", None))
-        self.apply_fft_button.setText(QCoreApplication.translate("MainWindow", u"Apply FFT", None))
         self.plotting_group.setTitle(QCoreApplication.translate("MainWindow", u"Plotting", None))
         self.raw_visible_check.setText(QCoreApplication.translate("MainWindow", u"Raw Signal", None))
         self.filtered_visible_check.setText(QCoreApplication.translate("MainWindow", u"Filtered Signal", None))
@@ -589,7 +541,6 @@ class Ui_MainWindow(object):
         self.filter_combo.setItemText(5, QCoreApplication.translate("MainWindow", u"Savitzky-Golay Filter", None))
         self.filter_combo.setItemText(6, QCoreApplication.translate("MainWindow", u"Pitch Shift", None))
         self.filter_combo.setItemText(7, QCoreApplication.translate("MainWindow", u"Reverse", None))
-        self.filter_combo.setItemText(8, QCoreApplication.translate("MainWindow", u"IFFT / Kalman Filter", None))
 
         self.label_filter_low.setText(QCoreApplication.translate("MainWindow", u"Low Frequency", None))
         self.filter_low_spin.setSuffix(QCoreApplication.translate("MainWindow", u" Hz", None))

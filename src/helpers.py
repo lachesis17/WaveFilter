@@ -263,9 +263,6 @@ class PlaybackWorker(QObject):
 
     def run(self):
         try:
-            import librosa
-            from src.filters import Filters
-
             signal = self._signal.copy()
             sample_rate = self._sample_rate
             for f_type, f_args in self._applied_filters:

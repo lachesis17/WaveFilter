@@ -2,7 +2,7 @@
 
 A desktop signal processing application with PySide6. Load audio or data files, visualise the raw and filtered waveforms alongside their FFT spectra and apply one or more filters in sequence with real-time previews and playback. Supports saving and loading of sessions and export to audio or excel files. Along with filters, pitch shifting and reverse can be applied to create exportable looping samples.
 
-![wavefilter](https://github.com/user-attachments/assets/fae6cdc3-1597-46fa-bb25-5a7f445315c1)
+![wavefilter](https://github.com/user-attachments/assets/2eb40dfb-c6f3-48df-bf79-c9797bbcd0d9)
 
 ---
 
@@ -26,17 +26,16 @@ A desktop signal processing application with PySide6. Load audio or data files, 
 
 ## Filter Types
 
-| Filter         | Parameters                                         | Notes                                                                              |
-| -------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Low Pass       | Low Frequency, Order, Design                       | Attenuates frequencies above the cutoff                                            |
-| High Pass      | High Frequency, Order, Design                      | Attenuates frequencies below the cutoff                                            |
-| Band Pass      | Low Frequency, High Frequency, Order, Design       | Passes a frequency band, attenuates outside                                        |
-| Band Stop      | Low Frequency, High Frequency, Order, Design       | Attenuates a frequency band, passes outside                                        |
-| Notch          | Low Frequency                                      | Narrow band rejection at a single frequency                                        |
-| Savitzky-Golay | Window Length, Poly Order                          | Polynomial smoothing filter                                                        |
-| Pitch Shift    | Semitones (-36 to +36)                             | Shifts pitch without changing duration (via librosa)                               |
-| Reverse        |                                                    | Reverses the signal                                                                |
-| IFFT / Kalman  | Window, Low/High/Amplitude threshold, Kalman noise | Peak-based frequency isolation via inverse FFT, with optional Kalman pre-smoothing |
+| Filter         | Parameters                                   | Notes                                                |
+| -------------- | -------------------------------------------- | ---------------------------------------------------- |
+| Low Pass       | Low Frequency, Order, Design                 | Attenuates frequencies above the cutoff              |
+| High Pass      | High Frequency, Order, Design                | Attenuates frequencies below the cutoff              |
+| Band Pass      | Low Frequency, High Frequency, Order, Design | Passes a frequency band, attenuates outside          |
+| Band Stop      | Low Frequency, High Frequency, Order, Design | Attenuates a frequency band, passes outside          |
+| Notch          | Low Frequency                                | Narrow band rejection at a single frequency          |
+| Savitzky-Golay | Window Length, Poly Order                    | Polynomial smoothing filter                          |
+| Pitch Shift    | Semitones (-36 to +36)                       | Shifts pitch without changing duration (via librosa) |
+| Reverse        |                                              | Reverses the signal                                  |
 
 ## Filter Designs (IIR filters)
 
@@ -50,18 +49,11 @@ A desktop signal processing application with PySide6. Load audio or data files, 
 
 ## FFT Modes
 
-| Mode  | Description                                 |
-| ----- | ------------------------------------------- |
-| FFT   | Fast Fourier Transform                      |
-| IFFT  | Inverse FFT                                 |
-| RFFT  | FFT of strictly real-valued sequence        |
-| IRFFT | Inverse of RFFT                             |
-| HFFT  | FFT of a Hermitian sequence (real spectrum) |
-| IHFFT | Inverse of HFFT                             |
-| DCT   | Discrete cosine transform                   |
-| IDCT  | Inverse DCT                                 |
-| DST   | Discrete sine transform                     |
-| IDST  | Inverse DST                                 |
+| Mode | Description               |
+| ---- | ------------------------- |
+| FFT  | Fast Fourier Transform    |
+| DCT  | Discrete cosine transform |
+| DST  | Discrete sine transform   |
 
 ---
 

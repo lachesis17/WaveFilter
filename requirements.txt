@@ -7,7 +7,6 @@ scipy
 pandas
 openpyxl
 librosa
-filterpy
 sounddevice
 h5py
 auto-py-to-exe

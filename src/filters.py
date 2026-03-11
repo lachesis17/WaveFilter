@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import scipy.fft as fft
-from filterpy.kalman import KalmanFilter
 from scipy.signal import filtfilt, find_peaks, iirfilter, iirnotch, savgol_filter, sosfiltfilt
 
 
@@ -30,26 +29,10 @@ class Filters:
             win = np.hanning(num_samples)
             signal = signal * win
 
-        if fft_mode == "FFT - Fast Fourier Transform":
-            fft_amp = fft.fft(signal, overwrite_x=False)
-        elif fft_mode == "IFFT - Inverse FFT":
-            fft_amp = fft.ifft(signal, overwrite_x=False)
-        elif fft_mode == "RFFT - FFT of strictly real-valued sequence":
-            fft_amp = fft.rfft(signal, overwrite_x=False)
-        elif fft_mode == "IRFFT - Inverse of RFFT":
-            fft_amp = fft.irfft(signal, overwrite_x=False)
-        elif fft_mode == "HFFT - FFT of a Hermitian sequence (real spectrum)":
-            fft_amp = fft.hfft(signal, overwrite_x=False)
-        elif fft_mode == "IHFFT - Inverse of HFFT":
-            fft_amp = fft.ihfft(signal, overwrite_x=False)
-        elif fft_mode == "DCT - Discrete cosine transform":
+        if fft_mode == "DCT - Discrete cosine transform":
             fft_amp = fft.dct(signal, overwrite_x=False)
-        elif fft_mode == "IDCT - Inverse DCT":
-            fft_amp = fft.idct(signal, overwrite_x=False)
         elif fft_mode == "DST - Discrete sine transform":
             fft_amp = fft.dst(signal, overwrite_x=False)
-        elif fft_mode == "IDST - Inverse DST":
-            fft_amp = fft.idst(signal, overwrite_x=False)
         else:
             fft_amp = fft.fft(signal, overwrite_x=False)
 
@@ -91,73 +74,11 @@ class Filters:
 
         return freq, fft_amp, fft_amp_normalised, sample_rate, num_samples
 
-    def apply_inverse_fft(self, original_signal, peaks, time):
-        filtered_fft = np.zeros_like(original_signal, dtype=complex)
-        for peak_index in peaks:
-            filtered_fft[peak_index] = original_signal[peak_index]
-            if peak_index != 0:
-                filtered_fft[-peak_index] = np.conj(original_signal[peak_index])
-
-        ifft_result = np.fft.ifft(filtered_fft)
-        max_val = np.max(np.abs(ifft_result))
-        if max_val > 0:
-            ifft_result = ifft_result / max_val
-        return np.real(ifft_result)
-
-    def find_raw_peaks(self, *_args):
-        if len(_args) == 1:
-            window = _args[0][0]
-            low_thresh = _args[0][1]
-            high_thresh = _args[0][2]
-            amp_thresh = _args[0][3]
-            kalman = _args[0][4]
-            kalman_noise = _args[0][5]
-        else:
-            window, low_thresh, high_thresh, amp_thresh, kalman, kalman_noise = _args
-
-        if kalman:
-            raw_signal = self._raw
-            kf1 = KalmanFilter(dim_x=1, dim_z=1)
-            kf1.x = np.array([[0.]])
-            kf1.F = np.array([[1.]])
-            kf1.H = np.array([[1.]])
-            kf1.P *= 1000.
-            kf1.R = kalman_noise
-            kf1.Q = 0.1
-
-            smoothed = np.zeros_like(raw_signal)
-            for i in range(len(raw_signal)):
-                kf1.predict()
-                kf1.update(raw_signal[i])
-                smoothed[i] = kf1.x[0]
-
-            fft_freq, fft_amp, fft_amp_normalised, sample_rate, num_samples = self.apply_forward_fft(
-                signal=smoothed, time=self._time, window=window)
-
-            kf = KalmanFilter(dim_x=1, dim_z=1)
-            kf.x = np.array([[0.]])
-            kf.F = np.array([[1.]])
-            kf.H = np.array([[1.]])
-            kf.P *= 1000.
-            kf.R = kalman_noise
-            kf.Q = 0.1
-
-            smoothed_data = []
-            for z in fft_amp_normalised:
-                kf.predict()
-                kf.update(np.array([[z]]))
-                smoothed_data.append(kf.x[0, 0])
-
-            smoothed_fft_amp = np.array(smoothed_data)
-            peaks, _ = find_peaks(smoothed_fft_amp, height=amp_thresh)
-            peak_freqs = fft_freq[peaks]
-        else:
-            fft_freq, fft_amp, fft_amp_normalised, sample_rate, num_samples = self.apply_forward_fft(
-                signal=self._raw, time=self._time, window=window)
-            peaks, _ = find_peaks(fft_amp_normalised, height=amp_thresh)
-            peak_freqs = fft_freq[peaks]
-
-        ifft = self.apply_inverse_fft(original_signal=fft_amp, peaks=peaks, time=self._time)
+    def find_raw_peaks(self, window, low_thresh, high_thresh, amp_thresh):
+        fft_freq, _, fft_amp_normalised, _, _ = self.apply_forward_fft(
+            signal=self._raw, time=self._time, window=window)
+        peaks, _ = find_peaks(fft_amp_normalised, height=amp_thresh)
+        peak_freqs = fft_freq[peaks]
 
         low_freq_peaks = peak_freqs[peak_freqs < low_thresh]
         high_freq_peaks = peak_freqs[peak_freqs > high_thresh]
@@ -168,7 +89,7 @@ class Filters:
         low_f = round(low_freq_range_start, 2) if low_freq_range_start is not None else None
         high_f = round(high_freq_range_start / 1000, 2) if high_freq_range_start is not None else None
 
-        return ifft, low_f, high_f, high_freq_range_start, (window, low_thresh, high_thresh, amp_thresh, kalman, kalman_noise)
+        return low_f, high_f, high_freq_range_start
 
     @staticmethod
     def apply_standard_filter(signal_series, sample_rate, filter_type, low_freq, high_freq, order,

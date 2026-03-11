@@ -110,7 +110,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.generate_button.clicked.connect(self._generate_test_signal)
         self.play_button.clicked.connect(self._toggle_playback)
         self.stop_button.clicked.connect(self._stop_audio)
-        self.apply_fft_button.clicked.connect(self._apply_fft_handler)
         self.apply_filter_button.clicked.connect(self._apply_filter_committed)
         self.clear_button.clicked.connect(self._clear_filters)
 
@@ -124,14 +123,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         for widget in (self.filter_low_spin, self.filter_high_spin,
                        self.filter_order_spin, self.ripple_spin,
-                       self.attenuation_spin, self.low_peak_freq_spin,
-                       self.high_peak_freq_spin, self.min_peak_amp_spin,
-                       self.kalman_noise_spin, self.window_check_filter,
-                       self.kalman_check, self.normalize_check,
-                       self.window_check_fft, self.filter_combo,
-                       self.filter_design_combo, self.fft_mode_combo):
+                       self.attenuation_spin, self.window_check_filter,
+                       self.filter_combo, self.filter_design_combo):
             sig = widget.toggled if hasattr(widget, 'isChecked') else widget.currentIndexChanged if hasattr(widget, 'currentIndex') else widget.valueChanged
             sig.connect(self._on_filter_param_changed)
+
+        for widget in (self.low_peak_freq_spin, self.high_peak_freq_spin,
+                       self.min_peak_amp_spin, self.normalize_check,
+                       self.window_check_fft, self.fft_mode_combo):
+            sig = widget.toggled if hasattr(widget, 'isChecked') else widget.currentIndexChanged if hasattr(widget, 'currentIndex') else widget.valueChanged
+            sig.connect(self._on_fft_param_changed)
 
         self.actionLine_Colors.triggered.connect(self._open_line_colors_dialog)
         self.actionSave_Session.triggered.connect(self._save_session)
@@ -157,6 +158,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _on_filter_param_changed(self):
         if self.preview_check.isChecked():
             self._apply_filter_preview()
+
+    def _on_fft_param_changed(self):
+        self._apply_fft()
 
     def _filter_changed_handler(self):
         filter_type = self.filter_combo.currentText()
@@ -194,10 +198,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.filter_low_spin.setEnabled(False)
             self.filter_high_spin.setEnabled(False)
             self.filter_order_spin.setEnabled(False)
-            self._set_design_visible(False)
-        elif filter_type == "IFFT / Kalman Filter":
-            self.filter_low_spin.setEnabled(False)
-            self.filter_high_spin.setEnabled(False)
             self._set_design_visible(False)
         elif filter_type == "Notch Filter":
             self.filter_low_spin.setEnabled(True)
@@ -757,28 +757,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self._apply_fft()
 
-    def _apply_fft(self, _args=None):
+    def _apply_fft(self):
         if self.filter_obj is None:
-            return None, None
-
-        if _args is None:
-            _args = [
-                self.window_check_fft.isChecked(),
-                self.low_peak_freq_spin.value(),
-                self.high_peak_freq_spin.value(),
-                self.min_peak_amp_spin.value(),
-                self.kalman_check.isChecked(),
-                self.kalman_noise_spin.value(),
-            ]
+            return
 
         fft_df = self.filter_obj.apply_fft(
-            window=_args[0] if isinstance(_args, (list, tuple)) else self.window_check_fft.isChecked(),
+            window=self.window_check_fft.isChecked(),
             normalise=self.normalize_check.isChecked(),
             fft_mode=self.fft_mode_combo.currentText(),
         )
 
         if 'FFT Raw Frequency' not in fft_df.columns:
-            return None, None
+            return
 
         freq = fft_df['FFT Raw Frequency'].to_numpy()
         amp = fft_df['FFT Raw Amplitude'].to_numpy()
@@ -794,24 +784,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.fft_line.setData(x=freq, y=amp)
 
         try:
-            ifft_filter, low_f, high_f, high_freq_range_start, kalman_args = \
-                self.filter_obj.find_raw_peaks(_args)
+            low_f, high_f, high_freq_range_start = self.filter_obj.find_raw_peaks(
+                self.window_check_fft.isChecked(),
+                self.low_peak_freq_spin.value(),
+                self.high_peak_freq_spin.value(),
+                self.min_peak_amp_spin.value(),
+            )
         except Exception as e:
             print(f"Peak detection error: {e}")
-            return None, None
+            return
 
         self._draw_peak_lines(low_f, high_f, high_freq_range_start)
-        return ifft_filter, kalman_args
 
-    def _apply_fft_handler(self):
-        self._apply_fft([
-            self.window_check_fft.isChecked(),
-            self.low_peak_freq_spin.value(),
-            self.high_peak_freq_spin.value(),
-            self.min_peak_amp_spin.value(),
-            self.kalman_check.isChecked(),
-            self.kalman_noise_spin.value(),
-        ])
 
     def _draw_peak_lines(self, low_f, high_f, high_freq_range_start):
         if low_f is not None:
@@ -903,30 +887,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.filter_obj._applied_filters.append((filter_type, []))
             return
 
-        if filter_type == "IFFT / Kalman Filter":
-            ifft_args = _args if _args is not None else [
-                self.window_check_fft.isChecked(),
-                self.low_peak_freq_spin.value(),
-                self.high_peak_freq_spin.value(),
-                self.min_peak_amp_spin.value(),
-                self.kalman_check.isChecked(),
-                self.kalman_noise_spin.value(),
-            ]
-            result, kalman_args = self._apply_fft(_args=ifft_args)
-            if result is None:
-                return
-
-            if self.window_check_filter.isChecked():
-                win = np.hanning(len(result))
-                result = result * win
-
-            result = self.filter_obj.normalise_custom(result)
-            self.filter_obj._filtered = result
-
-            if apply:
-                self.filter_obj._applied_filters.append((filter_type, kalman_args))
-            return
-
         if _args is not None:
             low_freq, high_freq, order, window_arg = _args[0], _args[1], _args[2], _args[3]
             filter_design = _args[4] if len(_args) > 4 else 'butter'
@@ -985,7 +945,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._keep_playback_position()
         filter_type = self.filter_combo.currentText()
 
-        if filter_type in ("IFFT / Kalman Filter", "Reverse"):
+        if filter_type == "Reverse":
             self._apply_filter(filter_type=filter_type, apply=True, stack=False)
             self.preview_check.setChecked(False)
             self._refresh()
